@@ -357,13 +357,13 @@
       <form id="cardForm">
         <div class="section-title">Personal Details</div>
         <div class="grid">
-          <label>Marathi Name <input name="marathiName" value="नाव"></label>
-          <label>English Name <input name="englishName" value="Name"></label>
+          <label>Marathi Name <input name="marathiName" value=""></label>
+          <label>English Name <input name="englishName" value=""></label>
           <label>DOB
             <input
               name="dobDate"
               type="date"
-              value="1973-01-01"
+              value=""
               autocomplete="bday"
             >
             <input type="hidden" name="dob" value="01-01-1973">
@@ -375,11 +375,11 @@
               <option value="Transgender">Transgender</option>
             </select>
           </label>
-          <label>Mobile <input name="mobile" value="8888160485"></label>
+          <label>Mobile <input name="mobile" value=""></label>
           <label>Aadhaar No
             <input
               name="aadhaar"
-              value="9224 4188 1974"
+              value=""
               placeholder="1234 5678 9012"
               inputmode="numeric"
               autocomplete="off"
@@ -389,7 +389,7 @@
           <label>Card Number
             <input
               name="cardNumber"
-              value="3546 2904 499"
+              value=""
               placeholder="1234 5678 901"
               inputmode="numeric"
               autocomplete="off"
@@ -798,9 +798,9 @@ async function downloadPdf() {
         district: "अहिल्यानगर",
         taluka: "अकोले",
         village: "ब्राह्मणवाडा",
-        gatNo: "307/2",
-        khateNo: "462",
-        area: "0.4550"
+        gatNo: "",
+        khateNo: "",
+        area: ""
       }));
       addLandRowBtn.disabled = false;
     }
