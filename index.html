@@ -58,14 +58,20 @@
     .scaled-card { width: 504px; height: 325px; position: relative; }
 
     .id-card {
-      width: 1008px; height: 650px; position: relative; overflow: hidden; background: #eef6ef;
-      box-shadow: 0 18px 50px rgba(23, 48, 35, 0.12); transform: scale(0.5); transform-origin: top left;
-      font-family: Poppins, "Noto Sans Devanagari", Arial, sans-serif;
-      background-size: 100% 100%;
-      background-repeat: no-repeat;
+        width: 1008px;
+        height: 650px;
+        position: relative;
+        overflow: hidden;
+        background: #eef6ef;
+        box-shadow: 0 18px 50px rgba(23, 48, 35, 0.12);
+        transform: scale(0.5);
+        transform-origin: top left;
+        font-family: Poppins, "Noto Sans Devanagari", Arial, sans-serif;
+        background-size: 100% 100%;
+        background-repeat: no-repeat;
     }
-    .front-card { background-image: url("assets/card-front-reference.png"); }
-    .back-card { background-image: url("assets/card-back-reference.png"); }
+    .front-card { background-image: url("assets/card-front-reference.png");}
+    .back-card { background-image: url("assets/card-back-reference.png");}
 
     .top-bar, .bottom-bar { position: absolute; left: 0; right: 0; background: #236b4f; }
     .top-bar { top: 0; height: 117px; display: none; align-items: center; padding: 0 39px; color: white; }
@@ -140,7 +146,12 @@
       z-index: -1;
     }
 
-    .back-card { border: 4px solid #c4f0cf; background-color: #eef6ef; padding: 0; }
+    .back-card {
+      background-image: none;
+      background-color: #eef6ef;
+      border: 4px solid #000;
+      box-sizing: border-box;
+    }
 
     .back-leaves { position: absolute; right: 36px; top: 43px; width: 232px; height: 119px; opacity: 0.95; display: none; }
     .small-leaf { position: absolute; width: 118px; height: 62px; background: #236b4f; border-radius: 90% 0 90% 0; transform: rotate(-13deg); }
@@ -174,8 +185,10 @@
 
     /* Clean Canva-layer reconstruction. No finished-card screenshot is used underneath. */
     .front-card {
-      background-image: none;
-      background-color: #eef6ef;
+        background-image: none;
+        background-color: #eef6ef;
+        border: 4px solid #000;
+        box-sizing: border-box;
     }
     .front-card .top-bar {
       display: flex;
@@ -269,7 +282,7 @@
     .back-card {
       background-image: none;
       background-color: #eef6ef;
-      border: 4px solid #c4f0cf;
+      border: 4px solid #000;
     }
     .back-card .back-leaves {
       display: block;
@@ -403,7 +416,6 @@
     <section class="preview-panel">
       <div class="preview-toolbar">
         <h2>Live Preview</h2>
-        <div class="preview-note">PDF includes front and back on separate pages.</div>
       </div>
       <div class="cards">
         <div class="card-shell"><div class="card-label">Front</div><div class="scaled-card" id="frontPreview"></div></div>
@@ -653,33 +665,109 @@
       return html2canvas(card, { scale: 2, backgroundColor: null, useCORS: true, logging: false });
     }
 
-    async function downloadPdf() {
-      if (!window.html2canvas || !window.jspdf) {
-        alert("PDF libraries are not loaded. Please connect to the internet and refresh this page once, then try Download PDF again.");
+    // async function downloadPdf() {
+    //   if (!window.html2canvas || !window.jspdf) {
+    //     alert("PDF libraries are not loaded. Please connect to the internet and refresh this page once, then try Download PDF again.");
+    //     return;
+    //   }
+    //   downloadBtn.disabled = true;
+    //   downloadBtn.textContent = "Creating PDF...";
+    //   const data = formData();
+    //   printStack.innerHTML = "";
+    //   const front = makeCard(frontTemplate, data);
+    //   const back = makeCard(backTemplate, data);
+    //   printStack.append(front, back);
+    //   await new Promise((resolve) => setTimeout(resolve, 250));
+    //   const { jsPDF } = window.jspdf;
+    //   const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: [101.6,152.4] });
+    //   const frontCanvas = await cardCanvas(front);
+    //   const backCanvas = await cardCanvas(back);
+    //   pdf.addImage(frontCanvas.toDataURL("image/png"), "PNG", 0, 0, 1008, 650);
+    //   pdf.addPage([1008, 650], "landscape");
+    //   pdf.addImage(backCanvas.toDataURL("image/png"), "PNG", 0, 0, 1008, 650);
+    //   const name = (data.englishName || "Farmer").trim().replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase();
+    //   pdf.save(`${name || "Farmer"}-card.pdf`);
+    //   printStack.innerHTML = "";
+    //   downloadBtn.disabled = false;
+    //   downloadBtn.textContent = "Download PDF";
+    // }
+async function downloadPdf() {
+    if (!window.html2canvas || !window.jspdf) {
+        alert("PDF libraries are not loaded.");
         return;
-      }
-      downloadBtn.disabled = true;
-      downloadBtn.textContent = "Creating PDF...";
-      const data = formData();
-      printStack.innerHTML = "";
-      const front = makeCard(frontTemplate, data);
-      const back = makeCard(backTemplate, data);
-      printStack.append(front, back);
-      await new Promise((resolve) => setTimeout(resolve, 250));
-      const { jsPDF } = window.jspdf;
-      const pdf = new jsPDF({ orientation: "landscape", unit: "px", format: [1008, 650] });
-      const frontCanvas = await cardCanvas(front);
-      const backCanvas = await cardCanvas(back);
-      pdf.addImage(frontCanvas.toDataURL("image/png"), "PNG", 0, 0, 1008, 650);
-      pdf.addPage([1008, 650], "landscape");
-      pdf.addImage(backCanvas.toDataURL("image/png"), "PNG", 0, 0, 1008, 650);
-      const name = (data.englishName || "Farmer").trim().replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase();
-      pdf.save(`${name || "Farmer"}-card.pdf`);
-      printStack.innerHTML = "";
-      downloadBtn.disabled = false;
-      downloadBtn.textContent = "Download PDF";
     }
 
+    downloadBtn.disabled = true;
+    downloadBtn.textContent = "Creating PDF...";
+
+    const data = formData();
+
+    printStack.innerHTML = "";
+
+    const front = makeCard(frontTemplate, data);
+    const back = makeCard(backTemplate, data);
+
+    printStack.append(front, back);
+
+    // Wait for QR code and images
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    const frontCanvas = await cardCanvas(front);
+    const backCanvas = await cardCanvas(back);
+
+    const { jsPDF } = window.jspdf;
+
+    // 4 × 6 inch Portrait Paper
+    const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: [152.4, 101.6]
+    });
+
+    // PVC Card Size
+    const cardWidth = 85.60;
+    const cardHeight = 53.98;
+
+    // Center Horizontally
+    const x = (101.6 - cardWidth) / 2;
+
+    // Vertical Positions
+    const topMargin = 8;
+    const gap = 8;
+
+    // FRONT CARD
+    pdf.addImage(
+        frontCanvas.toDataURL("image/png"),
+        "PNG",
+        x,
+        topMargin,
+        cardWidth,
+        cardHeight
+    );
+
+    // BACK CARD
+    pdf.addImage(
+        backCanvas.toDataURL("image/png"),
+        "PNG",
+        x,
+        topMargin + cardHeight + gap,
+        cardWidth,
+        cardHeight
+    );
+
+    const name = (data.englishName || "Farmer")
+        .trim()
+        .replace(/[^a-z0-9]+/gi, "-")
+        .replace(/^-|-$/g, "")
+        .toLowerCase();
+
+    pdf.save(`${name || "Farmer"}-card.pdf`);
+
+    printStack.innerHTML = "";
+
+    downloadBtn.disabled = false;
+    downloadBtn.textContent = "Download PDF";
+}
 
     form.addEventListener("input", (event) => {
       if (event.target.name === "aadhaar") event.target.value = formatAadhaar(event.target.value);
