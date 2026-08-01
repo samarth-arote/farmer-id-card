@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Employee Card Generator</title>
+  <title>Farmer Card Generator</title>
   <script src="assets/vendor/html2canvas.min.js"></script>
   <script src="assets/vendor/jspdf.umd.min.js"></script>
   <script src="assets/vendor/qrcode.min.js"></script>
@@ -233,12 +233,12 @@
       width: 190px;
       height: 188px;
     }
-    .front-card [data-field="marathiName"] { left: 366.63px; top: 178px; min-width: 270px; }
-    .front-card .name-row .english-name { left: 366.63px; top: 219px; min-width: 300px; }
-    .front-card [data-field="dob"] { left: 560px; top: 276px; min-width: 155px; }
-    .front-card [data-field="gender"] { left: 510px; top: 343px; min-width: 80px; }
-    .front-card [data-field="mobile"] { left: 548px; top: 405px; min-width: 180px; }
-    .front-card [data-field="aadhaar"] { left: 635px; top: 472px; min-width: 220px; }
+    .front-card [data-field="marathiName"] { left: 36.4%; top: 178px; min-width: 270px; }
+    .front-card .name-row .english-name { left: 36.4%; top: 219px; min-width: 300px; }
+    .front-card [data-field="dob"] { left: 55.5%; top: 276px; min-width: 155px; }
+    .front-card [data-field="gender"] { left: 50.6%; top: 343px; min-width: 80px; }
+    .front-card [data-field="mobile"] { left: 54.4%; top: 405px; min-width: 180px; }
+    .front-card [data-field="aadhaar"] { left: 63.5%; top: 472px; min-width: 220px; }
     .front-card .value,
     .front-card .name-row .english-name {
       background: transparent;
@@ -446,7 +446,7 @@
       const node = template.content.firstElementChild.cloneNode(true);
       node.querySelectorAll("[data-field]").forEach((element) => { element.textContent = data[element.dataset.field] || ""; });
       const photoBox = node.querySelector("[data-photo-box]");
-      if (photoBox && photoDataUrl) photoBox.innerHTML = `<img alt="Employee photo" src="${photoDataUrl}">`;
+      if (photoBox && photoDataUrl) photoBox.innerHTML = `<img alt="Farmer photo" src="${photoDataUrl}">`;
       const qr = node.querySelector("[data-qr]");
       if (qr) {
         qr.innerHTML = "";
@@ -498,8 +498,8 @@
       pdf.addImage(frontCanvas.toDataURL("image/png"), "PNG", 0, 0, 1008, 650);
       pdf.addPage([1008, 650], "landscape");
       pdf.addImage(backCanvas.toDataURL("image/png"), "PNG", 0, 0, 1008, 650);
-      const name = (data.englishName || "employee").trim().replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase();
-      pdf.save(`${name || "employee"}-card.pdf`);
+      const name = (data.englishName || "Farmer").trim().replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase();
+      pdf.save(`${name || "Farmer"}-card.pdf`);
       printStack.innerHTML = "";
       downloadBtn.disabled = false;
       downloadBtn.textContent = "Download PDF";
