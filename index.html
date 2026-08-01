@@ -167,22 +167,6 @@
       .preview-toolbar { display: grid; }
       .scaled-card { width: min(100%, 504px); height: auto; aspect-ratio: 1008 / 650; }
       .id-card { transform: scale(calc((100vw - 36px) / 1008)); }
-
-      /* Mobile-only: tighten front text layout so values (Aadhaar/Mobile/etc.) look compact like mobile preview. */
-      .front-card [data-field="marathiName"] { min-width: 230px; font-size: 24px; }
-      .front-card .name-row .english-name { min-width: 240px; font-size: 24px; }
-
-      .front-card [data-field="dob"] { min-width: 132px; font-size: 22px; }
-      .front-card [data-field="gender"] { min-width: 110px; font-size: 22px; }
-
-      .front-card [data-field="mobile"] { min-width: 205px; font-size: 22px; }
-      .front-card [data-field="aadhaar"] { min-width: 265px; font-size: 20.5px; }
-
-      /* Reduce label/value visual padding effects on tight layouts (still no wrapping). */
-      .front-card .value {
-        padding: 0 6px;
-      }
-      .front-card .detail-row { white-space: nowrap; }
     }
 
     /* Clean Canva-layer reconstruction. No finished-card screenshot is used underneath. */
