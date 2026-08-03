@@ -2,428 +2,285 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- MODIFIED: Added full responsive viewport settings -->
+  <!-- Reason: Ensures proper display scale on mobile phones and tablets without horizontal zooming -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Farmer Card Generator</title>
+
+  <!-- Google Fonts: Inter & Poppins for modern professional typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600;700;800&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="style.css">
   <script src="assets/vendor/html2canvas.min.js"></script>
   <script src="assets/vendor/jspdf.umd.min.js"></script>
   <script src="assets/vendor/qrcode.min.js"></script>
-  <style>
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      min-height: 100vh;
-      background: #f4f7f4;
-      color: #151515;
-      font-family: Poppins, Arial, sans-serif;
-    }
-    button, input, textarea { font: inherit; }
-    .app { display: grid; grid-template-columns: minmax(330px, 420px) 1fr; min-height: 100vh; }
-    .form-panel { background: #fff; border-right: 1px solid #dfe8e1; padding: 24px; overflow: auto; }
-    .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
-    .brand-mark {
-      width: 44px; height: 44px; border-radius: 8px; display: grid; place-items: center;
-      background: #236b4f; color: #fff; font-weight: 800; font-size: 20px;
-    }
-    h1 { margin: 0; color: #236b4f; font-size: 22px; line-height: 1.15; }
-    .subtitle { margin: 3px 0 0; color: #65736a; font-size: 13px; }
-    .section-title {
-      margin: 22px 0 12px; color: #236b4f; font-size: 14px; font-weight: 700; text-transform: uppercase;
-    }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    label { display: grid; gap: 6px; color: #2c3b33; font-size: 12px; font-weight: 600; }
-    input, textarea {
-      width: 100%; border: 1px solid #cfdcd4; border-radius: 7px; padding: 10px 11px;
-      color: #151515; background: #fff; outline: none; font-size: 14px;
-    }
-    textarea { resize: vertical; min-height: 74px; }
-    input:focus, textarea:focus { border-color: #236b4f; box-shadow: 0 0 0 3px rgba(35, 107, 79, 0.12); }
-    .full { grid-column: 1 / -1; }
-    .actions {
-      display: flex; gap: 10px; margin-top: 22px; position: sticky; bottom: 0;
-      padding-top: 16px; background: linear-gradient(rgba(255,255,255,0), #fff 20%);
-    }
-    .btn { border: 0; border-radius: 7px; padding: 11px 14px; cursor: pointer; font-weight: 700; min-height: 44px; }
-    .btn-primary { flex: 1; color: #fff; background: #236b4f; }
-    .btn-secondary { color: #236b4f; background: #e9f2ec; }
-    .preview-panel { padding: 26px; overflow: auto; }
-    .preview-toolbar {
-      display: flex; align-items: center; justify-content: space-between; gap: 16px;
-      margin: 0 auto 18px; max-width: 1040px;
-    }
-    .preview-toolbar h2 { margin: 0; font-size: 18px; color: #236b4f; }
-    .preview-note { color: #65736a; font-size: 13px; }
-    .cards { display: grid; grid-template-columns: repeat(auto-fit, 504px); justify-content: center; gap: 24px; }
-    .card-shell { display: grid; gap: 10px; }
-    .card-label { color: #236b4f; font-size: 13px; font-weight: 700; }
-    .scaled-card { width: 504px; height: 325px; position: relative; }
-
-    .id-card {
-        width: 1008px;
-        height: 650px;
-        position: relative;
-        overflow: hidden;
-        background: #eef6ef;
-        box-shadow: 0 18px 50px rgba(23, 48, 35, 0.12);
-        transform: scale(0.5);
-        transform-origin: top left;
-        font-family: Poppins, "Noto Sans Devanagari", Arial, sans-serif;
-        background-size: 100% 100%;
-        background-repeat: no-repeat;
-    }
-    .front-card { background-image: url("assets/card-front-reference.png");}
-    .back-card { background-image: url("assets/card-back-reference.png");}
-
-    .top-bar, .bottom-bar { position: absolute; left: 0; right: 0; background: #236b4f; }
-    .top-bar { top: 0; height: 117px; display: none; align-items: center; padding: 0 39px; color: white; }
-    .bottom-bar {
-      bottom: 0; height: 117px; display: grid; grid-template-columns: 1fr 1.2fr; align-items: center;
-      padding: 0 105px 0 108px; gap: 36px; background: transparent;
-    }
-
-    .logo { display: flex; align-items: center; gap: 14px; font-weight: 700; line-height: 1; white-space: nowrap; }
-    .agri { font-size: 74px; }
-    .agri .dot, .record { color: #ffd324; }
-    .record { font-size: 55px; font-weight: 600; }
-
-    .plant-stack { width: 45px; height: 84px; position: relative; flex: 0 0 auto; }
-    .leaflet { position: absolute; width: 24px; height: 38px; background: #a7d719; border-radius: 0 22px 0 22px; transform: rotate(43deg); }
-    .leaflet.one { left: 8px; top: 2px; background: #b7df14; }
-    .leaflet.two { left: 24px; top: 12px; background: #9dd420; transform: rotate(43deg) scaleX(-1); }
-    .stack-line { position: absolute; left: 3px; width: 38px; height: 11px; background: #9bd51c; clip-path: polygon(50% 0, 100% 45%, 50% 100%, 0 45%); }
-    .stack-line.s1 { top: 43px; } .stack-line.s2 { top: 56px; } .stack-line.s3 { top: 69px; }
-
-    .title-dev { position: relative; top: 10px; margin-left: 24px; margin-right: 140px; font-size: 50px; font-weight: 800; line-height: 1; white-space: nowrap; }
-    .farmer-icon { position: absolute; right: 34px; top: 17px; width: 112px; height: 100px; }
-    .farmer-face { position: absolute; left: 35px; top: 23px; width: 44px; height: 48px; background: #ffd9ac; border: 3px solid #101010; border-radius: 50%; }
-    .turban { position: absolute; left: 21px; top: 0; width: 72px; height: 43px; background: repeating-linear-gradient(28deg, #ff7c00 0 9px, #111 9px 12px); border: 3px solid #111; border-radius: 46% 54% 18% 18%; transform: rotate(10deg); }
-    .body-shirt { position: absolute; left: 14px; bottom: -8px; width: 86px; height: 48px; background: #fff; border: 3px solid #111; border-bottom: 0; border-radius: 38px 38px 0 0; }
-    .mustache { position: absolute; left: 42px; top: 52px; width: 31px; height: 10px; background: #111; border-radius: 50%; z-index: 2; }
-
-    .photo-box { position: absolute; left: 36px; top: 146px; width: 179px; height: 188px; border: 4px solid #236b4f; border-radius: 13px; overflow: hidden; background: #fff; z-index: 3; }
-    .photo-box img { width: 100%; height: 100%; object-fit: cover; display: block; }
-    .photo-placeholder { width: 100%; height: 100%; display: grid; place-items: center; color: #6f7f75; background: #dde7df; font-size: 18px; font-weight: 700; text-align: center; padding: 18px; }
-
-    .big-leaf { position: absolute; left: 54px; top: 369px; width: 164px; height: 114px; background: #236b4f; border-radius: 90% 0 90% 8%; transform: skewX(-18deg) rotate(-10deg); display: none; }
-    .big-leaf::after { content: ""; position: absolute; left: 51px; top: 25px; width: 128px; height: 22px; border-top: 9px solid #fff; border-radius: 90% 0 0 0; transform: rotate(-20deg); }
-
-    .watermark { position: absolute; left: 288px; top: 128px; width: 528px; height: 362px; opacity: 0.07; pointer-events: none; display: none; }
-    .watermark::before { content: ""; position: absolute; left: 20px; top: 124px; width: 160px; height: 104px; border: 8px solid #236b4f; border-radius: 50%; }
-    .watermark::after { content: ""; position: absolute; right: 42px; top: 28px; width: 238px; height: 250px; border: 8px solid #236b4f; border-left-color: transparent; border-bottom-color: transparent; border-radius: 50%; transform: rotate(-32deg); }
-
-    .front-details { position: absolute; inset: 0; display: block; font-size: 29px; line-height: 1.13; z-index: 4; pointer-events: none; }
-    .detail-row { display: contents; white-space: nowrap; }
-    .label-dev { display: none; }
-
-    .value,
-    .name-row .english-name {
-      position: absolute;
-      color: #151515;
-      font-weight: 500;
-      background: #eef6ef;
-      padding: 0 8px;
-      line-height: 1.18;
-      white-space: nowrap;
-    }
-
-    [data-field="marathiName"] { left: 365px; top: 181px; min-width: 380px; font-size: 27px; }
-    .name-row .english-name { left: 364px; top: 222px; min-width: 390px; font-size: 27px; margin: 0; display: block; }
-
-    [data-field="dob"] { left: 500px; top: 277px; min-width: 225px; }
-    [data-field="gender"] { left: 499px; top: 346px; min-width: 190px; }
-    [data-field="mobile"] { left: 531px; top: 411px; min-width: 280px; }
-    [data-field="aadhaar"] { left: 598px; top: 478px; min-width: 350px; }
-
-    .qr-box { position: absolute; right: 37px; top: 278px; width: 174px; height: 174px; background: #fff; padding: 8px; display: grid; place-items: center; z-index: 3; }
-    .qr-box img, .qr-box canvas { width: 158px !important; height: 158px !important; }
-
-    .bottom-title { color: #fff200; font-size: 61px; font-weight: 800; white-space: nowrap; visibility: hidden; }
-    .bottom-number { color: #fff; font-size: 56px; font-weight: 800; white-space: nowrap; position: relative; z-index: 4; }
-    .bottom-number::before {
-      content: "";
-      position: absolute;
-      inset: -8px -18px -7px -16px;
-      background: #236b4f;
-      z-index: -1;
-    }
-
-    .back-card {
-      background-image: none;
-      background-color: #eef6ef;
-      border: 4px solid #000;
-      box-sizing: border-box;
-    }
-
-    .back-leaves { position: absolute; right: 36px; top: 43px; width: 232px; height: 119px; opacity: 0.95; display: none; }
-    .small-leaf { position: absolute; width: 118px; height: 62px; background: #236b4f; border-radius: 90% 0 90% 0; transform: rotate(-13deg); }
-    .small-leaf::after { content: ""; position: absolute; left: 42px; top: 14px; width: 73px; height: 16px; border-top: 5px solid #fff; border-radius: 100% 0 0 0; opacity: 0.75; transform: rotate(-17deg); }
-    .small-leaf.a { right: 0; top: 0; } .small-leaf.b { right: 110px; top: 14px; opacity: 0.16; } .small-leaf.c { right: 83px; top: 73px; transform: rotate(-13deg) scale(0.68); opacity: 0.17; }
-
-    .back-section { position: absolute; inset: 0; z-index: 4; pointer-events: none; }
-    .back-heading { margin: 0 0 12px; color: #17622c; font-size: 31px; font-weight: 800; line-height: 1.2; visibility: hidden; }
-
-    .address { position: absolute; left: 78px; top: 111px; margin: 0; max-width: 760px; font-size: 24px; line-height: 1.4; font-weight: 600; width: fit-content; background: #eef6ef; padding: 0 10px; }
-    .land-title { margin-bottom: 28px; font-size: 31px; color: #17622c; font-weight: 800; visibility: hidden; }
-
-    .land-grid {
-      position: absolute; left: 78px; right: 75px; top: 251px;
-      display: grid;
-      grid-template-columns: 1.05fr 0.95fr 1.2fr 0.9fr 0.9fr 1.1fr;
-      gap: 0;
-      column-gap: 20px;
-      row-gap: 12px;
-      align-items: start;
-    }
-    .land-head { color: #17622c; font-size: 25px; font-weight: 800; visibility: hidden; }
-
-    .land-row { display: contents; }
-    [data-land-rows] { display: contents; }
-    .land-cell { margin-top: 0; color: #1e1e1e; font-size: 21px; font-weight: 500; position: relative; width: fit-content; background: #eef6ef; padding: 0 8px; }
-    .land-cell::before { content: ""; position: absolute; inset: -4px -10px -4px -6px; z-index: -1; }
-
-    .footer-note { position: absolute; left: 126px; right: 126px; bottom: 13px; display: none; align-items: center; gap: 18px; color: #236b4f; font-size: 23px; font-weight: 700; text-align: center; }
-    .footer-note::before, .footer-note::after { content: ""; height: 2px; background: #236b4f; flex: 1; }
-
-    /* Clean Canva-layer reconstruction. No finished-card screenshot is used underneath. */
-    .front-card {
-        background-image: none;
-        background-color: #eef6ef;
-        border: 4px solid #000;
-        box-sizing: border-box;
-    }
-    .front-card .top-bar {
-      display: flex;
-      height: 125px;
-      background: #236b4f;
-    }
-    .front-card .bottom-bar {
-      height: 125px;
-      bottom: 0;
-      background: #236b4f;
-    }
-    .front-card .plant-stack {
-      background: url("assets/canva-layers/front-plant.png") center / contain no-repeat;
-      width: 52px;
-      height: 88px;
-    }
-    .front-card .plant-stack * { display: none; }
-    .front-card .farmer-icon {
-      right: 37px;
-      top: 12px;
-      width: 102px;
-      height: 113px;
-      background: url("assets/canva-layers/front-farmer.png") center / contain no-repeat;
-    }
-    .front-card .farmer-icon * { display: none; }
-    .front-card .watermark {
-      display: block;
-      left: 252px;
-      top: 112px;
-      width: 708px;
-      height: 413px;
-      opacity: 1;
-      background: url("assets/canva-layers/front-watermark.png") center / contain no-repeat;
-    }
-    .front-card .watermark::before,
-    .front-card .watermark::after { content: none; }
-    .front-card .big-leaf {
-      display: block;
-      left: 50px;
-      top: 361px;
-      width: 178px;
-      height: 126px;
-      background: url("assets/canva-layers/front-leaf.png") center / contain no-repeat;
-      border-radius: 0;
-      transform: none;
-    }
-    .front-card .big-leaf::after { content: none; }
-    .front-card .photo-box {
-      left: 25px;
-      top: 137px;
-      width: 203px;
-      height: 200px;
-      border-radius: 13px;
-    }
-    .front-card .qr-box {
-      left: 795px;
-      top: 274px;
-      width: 190px;
-      height: 188px;
-    }
-    .front-card [data-field="marathiName"] { left: 36.4%; top: 178px; min-width: 270px; }
-    .front-card .name-row .english-name { left: 36.4%; top: 219px; min-width: 300px; }
-    .front-card [data-field="dob"] { left: 55.5%; top: 276px; min-width: 155px; }
-    .front-card [data-field="gender"] { left: 50.6%; top: 343px; min-width: 80px; }
-    .front-card [data-field="mobile"] { left: 54.4%; top: 405px; min-width: 180px; }
-    .front-card [data-field="aadhaar"] { left: 63.5%; top: 472px; min-width: 220px; }
-    .front-card .value,
-    .front-card .name-row .english-name {
-      background: transparent;
-      padding: 0;
-    }
-    .front-card .label-dev {
-      display: block;
-      position: absolute;
-      color: #17622c;
-      font-weight: 800;
-      white-space: nowrap;
-    }
-    .front-card .detail-row:nth-child(1) .label-dev { left: 287.85px; top: 178.84px; }
-    .front-card .detail-row:nth-child(2) .label-dev { left: 287.85px; top: 276.9px; }
-    .front-card .detail-row:nth-child(3) .label-dev { left: 287.85px; top: 343.7px; }
-    .front-card .detail-row:nth-child(4) .label-dev { left: 287.85px; top: 406px; }
-    .front-card .detail-row:nth-child(5) .label-dev { left: 287.85px; top: 472.9px; }
-    .front-card .bottom-title {
-      visibility: visible;
-    }
-    .front-card .bottom-number::before {
-      content: none;
-    }
-
-    .back-card {
-      background-image: none;
-      background-color: #eef6ef;
-      border: 4px solid #000;
-    }
-    .back-card .back-leaves {
-      display: block;
-      left: 732px;
-      top: 37px;
-      width: 242px;
-      height: 127px;
-      background: url("assets/canva-layers/back-leaves.png") center / contain no-repeat;
-    }
-    .back-card .back-leaves * { display: none; }
-    .back-card .back-heading,
-    .back-card .land-title,
-    .back-card .land-head,
-    .back-card .footer-note {
-      visibility: visible;
-      display: block;
-    }
-    .back-card .back-heading {
-      position: absolute;
-      left: 80.88px;
-      top: 59.42px;
-      margin: 0;
-    }
-    .back-card .address {
-      left: 80.88px;
-      top: 111.22px;
-      min-width: 0;
-      background: transparent;
-      padding: 0;
-    }
-    .back-card .land-title {
-      position: absolute;
-      left: 80.88px;
-      top: 199.66px;
-      margin: 0;
-    }
-    .back-card .land-grid {
-      left: 80.88px;
-      top: 258.8px;
-      right: auto;
-      width: 831px;
-      grid-template-columns: 123.56px 125.58px 123.56px 125.58px 125.58px 123.56px;
-      gap: 0;
-      column-gap: 20px;
-      row-gap: 12px;
-    }
-    .back-card .land-cell {
-      margin-top: 0;
-      min-width: 0;
-      background: transparent;
-      padding: 0;
-    }
-    .back-card .footer-note {
-      left: 188.05px;
-      right: auto;
-      bottom: auto;
-      top: 608.81px;
-      width: 620px;
-    }
-  </style>
 </head>
 <body>
   <main class="app">
+    <!-- Left Sidebar: Professional Form Panel -->
     <aside class="form-panel">
+      <!-- MODIFIED: Modernized Brand Header with Custom Logo Image -->
+      <!-- Reason: Incorporates the newly created logo asset and version badge for a professional app identity -->
       <div class="brand">
-        <div class="brand-mark">ID</div>
-        <div>
-          <h1>Farmer Card Generator</h1>
-          <p class="subtitle">Fill the form, preview the card, download PDF.</p>
+        <div class="brand-logo-wrapper">
+          <img src="assets/logo.png" alt="Farmer ID Logo" class="brand-logo-img">
+        </div>
+        <div class="brand-info">
+          <div class="brand-title-row">
+            <h1>Farmer Card Generator</h1>
+            <span class="badge-pro">v2.0 PRO</span>
+          </div>
+          <p class="subtitle">Fill details, preview card, and export print-ready PDF</p>
         </div>
       </div>
+
       <form id="cardForm">
-        <div class="section-title">Personal Details</div>
-        <div class="grid">
-          <label>Marathi Name <input name="marathiName" value=""></label>
-          <label>English Name <input name="englishName" value=""></label>
-          <label>DOB
-            <input
-              name="dobDate"
-              type="date"
-              value=""
-              autocomplete="bday"
-            >
-            <input type="hidden" name="dob" value="01-01-1973">
-          </label>
-          <label>Gender
-            <select name="gender" aria-label="Gender">
-              <option value="Male" selected>Male</option>
-              <option value="Female">Female</option>
-              <option value="Transgender">Transgender</option>
-            </select>
-          </label>
-          <label>Mobile <input name="mobile" value=""></label>
-          <label>Aadhaar No
-            <input
-              name="aadhaar"
-              value=""
-              placeholder="1234 5678 9012"
-              inputmode="numeric"
-              autocomplete="off"
-              maxlength="14"
-            >
-          </label>
-          <label>Card Number
-            <input
-              name="cardNumber"
-              value=""
-              placeholder="1234 5678 901"
-              inputmode="numeric"
-              autocomplete="off"
-              maxlength="13"
-            >
-          </label>
-          <label>Photo <input name="photo" type="file" accept="image/*"></label>
+        <!-- MODIFIED: Section 1 - Personal Details in a Card Container with SVG Icon -->
+        <!-- Reason: Enhances readability and visual hierarchy using structured cards and intuitive iconography -->
+        <div class="form-card">
+          <div class="card-header">
+            <svg class="header-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20 21v-2a4 4 0 0 4-4H8a4 4 0 0 4-4 4v2"></path>
+              <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+            <h2>Personal Details</h2>
+          </div>
+
+          <div class="grid">
+            <label>
+              <span class="label-text">Marathi Name</span>
+              <input name="marathiName" value="" placeholder="उदा. मनोज रामदास शेवाळे">
+            </label>
+            <label>
+              <span class="label-text">English Name</span>
+              <input name="englishName" value="" placeholder="e.g. Manoj Ramdas Shewale">
+            </label>
+
+            <!-- MODIFIED: Preserved hidden DOB default value "01-01-1973" -->
+            <!-- Reason: Keeps original default data structure untouched while improving picker layout -->
+            <label>
+              <span class="label-text">DOB / जन्म तारीख</span>
+              <input
+                name="dobDate"
+                type="date"
+                value=""
+                autocomplete="bday"
+              >
+              <input type="hidden" name="dob" value="01-01-1973">
+            </label>
+
+            <label>
+              <span class="label-text">Gender / लिंग</span>
+              <select name="gender" aria-label="Gender">
+                <option value="Male" selected>Male</option>
+                <option value="Female">Female</option>
+                <option value="Transgender">Transgender</option>
+              </select>
+            </label>
+
+            <label>
+              <span class="label-text">Mobile / मोबाइल</span>
+              <input name="mobile" value="" placeholder="9876543210" inputmode="numeric" maxlength="10">
+            </label>
+
+            <label>
+              <span class="label-text">Aadhaar No / आधार नं</span>
+              <input
+                name="aadhaar"
+                value=""
+                placeholder="1234 5678 9012"
+                inputmode="numeric"
+                autocomplete="off"
+                maxlength="14"
+              >
+            </label>
+
+            <label>
+              <span class="label-text">Card Number / आयडी नं</span>
+              <input
+                name="cardNumber"
+                value=""
+                placeholder="1234 5678 901"
+                inputmode="numeric"
+                autocomplete="off"
+                maxlength="13"
+              >
+            </label>
+
+            <label>
+              <span class="label-text">Farmer Photo / फोटो</span>
+              <div class="file-upload-wrapper">
+                <input name="photo" type="file" accept="image/*" id="photoInput" class="file-input">
+                <label for="photoInput" class="file-label">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                  </svg>
+                  <span id="photoFileName">Choose Photo...</span>
+                </label>
+              </div>
+            </label>
+          </div>
         </div>
-        <div class="section-title">Address</div>
-        <div class="grid">
-          <label class="full">Complete Address <textarea name="address">Bramhanwada tal akole dist ahilyanagar</textarea></label>
+
+        <!-- MODIFIED: Section 2 - Address Card Container -->
+        <!-- Reason: Preserved default address string while wrapping in modern textarea styling -->
+        <div class="form-card">
+          <div class="card-header">
+            <svg class="header-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+              <circle cx="12" cy="10" r="3"></circle>
+            </svg>
+            <h2>Address / संपूर्ण पत्ता</h2>
+          </div>
+          <div class="grid">
+            <label class="full">
+              <span class="label-text">Complete Address</span>
+              <textarea name="address">Bramhanwada tal akole dist ahilyanagar</textarea>
+            </label>
+          </div>
         </div>
-        <div class="section-title">Land Details</div>
-        <div id="landRows" class="grid"></div>
-        <div style="display:flex; gap:10px; margin-top:12px; flex-wrap:wrap;">
-          <button class="btn btn-secondary" type="button" id="addLandRowBtn">Add Land Row</button>
+
+        <!-- MODIFIED: Section 3 - Dynamic Land Details Card Container -->
+        <!-- Reason: Keeps dynamic multi-row land entry feature with improved mobile grid & control buttons -->
+        <div class="form-card">
+          <div class="card-header">
+            <svg class="header-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+              <polyline points="9 22 9 12 15 12 15 22"></polyline>
+            </svg>
+            <h2>Land Details / जमिनीची माहिती</h2>
+          </div>
+          <div id="landRows" class="land-rows-container"></div>
+
+          <button class="btn btn-secondary btn-add-row" type="button" id="addLandRowBtn">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            Add Land Row
+          </button>
         </div>
+
+        <!-- MODIFIED: Form Actions Footer -->
+        <!-- Reason: Sticky mobile bar with high contrast primary/secondary buttons -->
         <div class="actions">
           <button class="btn btn-secondary" type="button" id="resetBtn">Reset</button>
-          <button class="btn btn-primary" type="button" id="downloadBtn">Download PDF</button>
+          <button class="btn btn-primary" type="button" id="downloadBtn">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            Download PDF
+          </button>
         </div>
       </form>
     </aside>
+
+    <!-- Right Side: Live Card Preview Panel -->
     <section class="preview-panel">
+      <!-- MODIFIED: Preview View Mode Controls (3D All-Direction Drag vs 360 Spin vs Both Cards) -->
+      <!-- Reason: Supports 360-degree all-direction trackball rotation using mouse drag & touch swipe -->
       <div class="preview-toolbar">
-        <h2>Live Preview</h2>
+        <div>
+          <h2>Live Preview</h2>
+        </div>
+        <div class="view-mode-buttons">
+          <button class="btn btn-secondary btn-mode active" type="button" id="btnModeFlip">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
+            </svg>
+            3D View
+          </button>
+
+          <button class="btn btn-secondary btn-mode" type="button" id="btnModeAutoSpin">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <path d="M12 8v4l3 3"></path>
+            </svg>
+            360° Auto Spin
+          </button>
+
+          <button class="btn btn-secondary btn-mode" type="button" id="btnModeBoth">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+              <line x1="8" y1="21" x2="16" y2="21"></line>
+              <line x1="12" y1="17" x2="12" y2="21"></line>
+            </svg>
+            Both Cards
+          </button>
+        </div>
       </div>
-      <div class="cards">
-        <div class="card-shell"><div class="card-label">Front</div><div class="scaled-card" id="frontPreview"></div></div>
-        <div class="card-shell"><div class="card-label">Back</div><div class="scaled-card" id="backPreview"></div></div>
+
+      <!-- MODIFIED: Container 1 - 4-Sided Curved 3D Physical PVC ATM/Debit Card -->
+      <!-- Reason: Adds top, bottom, left, right 3D edge panels and 4 curved corners for 100% 360-degree realistic card thickness -->
+      <div class="single-card-view" id="singleFlipContainer">
+        <div class="flip-hint-pill" id="flipHintPill">
+          <span>Drag in any direction to rotate 360°</span>
+          <span class="badge-side" id="cardSideBadge">FRONT</span>
+        </div>
+
+        <div class="flip-card-3d-stage" id="drag3dStage">
+          <div class="flip-card-3d-inner" id="flipCardInner">
+            <!-- 4-Sided Curved Plastic Core & Edge Panels (Top, Bottom, Left, Right + Corners) -->
+            <div class="card-edge-thickness">
+              <span class="edge-top"></span>
+              <span class="edge-bottom"></span>
+              <span class="edge-left"></span>
+              <span class="edge-right"></span>
+            </div>
+
+            <!-- Front Face -->
+            <div class="flip-card-face flip-card-front">
+              <div class="scaled-card-wrapper">
+                <div class="scaled-card" id="frontPreview3D"></div>
+                <div class="card-glare"></div>
+              </div>
+            </div>
+            <!-- Back Face -->
+            <div class="flip-card-face flip-card-back">
+              <div class="scaled-card-wrapper">
+                <div class="scaled-card" id="backPreview3D"></div>
+                <div class="card-glare"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MODIFIED: Container 2 - Side-by-Side Both Cards View -->
+      <!-- Reason: Displays Front and Back cards simultaneously for fast dual inspection -->
+      <div class="cards side-by-side-view hidden" id="bothCardsContainer">
+        <div class="card-shell mode-3d">
+          <div class="card-label">
+            <span class="dot-indicator"></span> Front Card
+          </div>
+          <div class="scaled-card-wrapper">
+            <div class="scaled-card" id="frontPreview"></div>
+            <div class="card-glare"></div>
+          </div>
+        </div>
+
+        <div class="card-shell mode-3d">
+          <div class="card-label">
+            <span class="dot-indicator"></span> Back Card
+          </div>
+          <div class="scaled-card-wrapper">
+            <div class="scaled-card" id="backPreview"></div>
+            <div class="card-glare"></div>
+          </div>
+        </div>
       </div>
     </section>
   </main>
+
   <div class="print-stack" id="printStack"></div>
+
+  <!-- UNTOUCHED ORIGINAL TEMPLATES FOR FRONT AND BACK ID CARDS -->
   <template id="frontTemplate">
     <div class="id-card front-card">
       <div class="top-bar">
@@ -449,6 +306,7 @@
       <div class="bottom-bar"><div class="bottom-title">फार्मर आयडी</div><div class="bottom-number" data-field="cardNumber"></div></div>
     </div>
   </template>
+
   <template id="backTemplate">
     <div class="id-card back-card">
       <div class="back-leaves"><span class="small-leaf a"></span><span class="small-leaf b"></span><span class="small-leaf c"></span></div>
@@ -466,391 +324,7 @@
       <div class="footer-note">This card is only for personal use not for Govt. identity</div>
     </div>
   </template>
-  <script>
-    const form = document.getElementById("cardForm");
-    const frontPreview = document.getElementById("frontPreview");
-    const backPreview = document.getElementById("backPreview");
-    const printStack = document.getElementById("printStack");
-    const frontTemplate = document.getElementById("frontTemplate");
-    const backTemplate = document.getElementById("backTemplate");
-    const downloadBtn = document.getElementById("downloadBtn");
-    const resetBtn = document.getElementById("resetBtn");
-    let photoDataUrl = "";
 
-    function getLandRows() {
-      // lands[0][district] etc.
-      const landsMap = {};
-      const fd = new FormData(form);
-      for (const [k, v] of fd.entries()) {
-        const m = /^lands\[(\d+)\]\[(district|taluka|village|gatNo|khateNo|area)\]$/.exec(k);
-        if (!m) continue;
-        const idx = Number(m[1]);
-        const field = m[2];
-        landsMap[idx] = landsMap[idx] || { district: "", taluka: "", village: "", gatNo: "", khateNo: "", area: "" };
-        landsMap[idx][field] = v;
-      }
-      const indices = Object.keys(landsMap).map(Number).sort((a,b)=>a-b);
-      return indices.map((i)=>landsMap[i]);
-    }
-
-    function formData() {
-      // Base fields (everything except photo + land array fields)
-      const data = Object.fromEntries(new FormData(form).entries());
-      delete data.photo;
-
-      const lands = getLandRows();
-
-      // Ensure DOB stored in dd-mm-yyyy for preview/QR
-      const dobDate = form.elements.dobDate ? form.elements.dobDate.value : "";
-      data.dob = formatDobDDMMYYYY(dobDate) || data.dob || "";
-
-      // Ensure Aadhaar formatting is consistent
-      if (data.aadhaar != null) {
-        data.aadhaar = formatAadhaar(data.aadhaar);
-      }
-
-      // Ensure Card Number formatting is consistent (4 + space + 4 + space + 3)
-      if (data.cardNumber != null) {
-        data.cardNumber = formatCardNumber(data.cardNumber);
-      }
-
-      // Remove legacy single land fields if present
-      delete data.district;
-      delete data.taluka;
-      delete data.village;
-      delete data.gatNo;
-      delete data.khateNo;
-      delete data.area;
-
-      data.lands = lands;
-      return data;
-    }
-
-    function qrPayload(data) {
-      return [`Name: ${data.englishName}`, `DOB: ${data.dob}`, `Gender: ${data.gender}`, `Mobile: ${data.mobile}`, `Aadhaar: ${data.aadhaar}`, `Card: ${data.cardNumber}`, `Address: ${data.address}`].join("\n");
-    }
-
-    function formatDobDDMMYYYY(value) {
-      // Supports:
-      // 1) HTML date input value: yyyy-mm-dd
-      // 2) plain typed input containing digits (ddmmyyyy)
-      if (!value) return "";
-
-      // yyyy-mm-dd
-      if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
-        const [yyyy, mm, dd] = value.split("-");
-        return `${dd}-${mm}-${yyyy}`;
-      }
-
-      // Fallback: ddmmyyyy digits
-      const digits = (value || "").replace(/\D/g, "").slice(0, 8); // ddmmyyyy
-      if (!digits) return "";
-      const dd = digits.slice(0, 2);
-      const mm = digits.slice(2, 4);
-      const yyyy = digits.slice(4, 8);
-      if (digits.length <= 2) return dd;
-      if (digits.length <= 4) return `${dd}-${mm}`;
-      return `${dd}-${mm}-${yyyy}`;
-    }
-
-    function formatAadhaar(value) {
-      const digits = (value || "").replace(/\D/g, "").slice(0, 12); // 12 digits only
-      if (!digits) return "";
-      const p1 = digits.slice(0, 4);
-      const p2 = digits.slice(4, 8);
-      const p3 = digits.slice(8, 12);
-      return `${p1} ${p2} ${p3}`; // 4 digits + space + 4 digits + space + 4 digits
-    }
-
-    function formatCardNumber(value) {
-      const digits = (value || "").replace(/\D/g, "").slice(0, 11); // 11 digits only
-      if (!digits) return "";
-      const p1 = digits.slice(0, 4);
-      const p2 = digits.slice(4, 8);
-      const p3 = digits.slice(8, 11);
-      return `${p1} ${p2} ${p3}`; // 4 digits + space + 4 digits + space + 3 digits
-    }
-
-    function isValidCardNumber(value) {
-      const digits = (value || "").replace(/\D/g, "");
-      return digits.length === 11;
-    }
-
-    function isValidAadhaar(value) {
-      const digits = (value || "").replace(/\D/g, "");
-      return digits.length === 12;
-    }
-
-    function makeCard(template, data) {
-      const node = template.content.firstElementChild.cloneNode(true);
-      node.querySelectorAll("[data-field]").forEach((element) => { element.textContent = data[element.dataset.field] || ""; });
-      const photoBox = node.querySelector("[data-photo-box]");
-      if (photoBox && photoDataUrl) photoBox.innerHTML = `<img alt="Farmer photo" src="${photoDataUrl}">`;
-      const qr = node.querySelector("[data-qr]");
-      if (qr) {
-        qr.innerHTML = "";
-        if (window.QRCode) {
-          new QRCode(qr, { text: qrPayload(data), width: 158, height: 158, correctLevel: QRCode.CorrectLevel.M });
-        } else {
-          qr.innerHTML = '<div style="font-size:11px;line-height:1.2;text-align:center;color:#111">QR library<br>not loaded</div>';
-        }
-      }
-
-      // Back land rows (dynamic)
-      const landRowsContainer = node.querySelector("[data-land-rows]");
-      if (landRowsContainer) {
-        const lands = Array.isArray(data.lands) ? data.lands : [];
-        // Auto adjust font-size / spacing for many rows (keeps layout from overflowing too much)
-        const rowCount = Math.max(1, lands.length);
-        const font = rowCount <= 1 ? 21 : rowCount === 2 ? 20 : rowCount === 3 ? 19 : rowCount === 4 ? 18 : 16;
-        const cellStyle = `font-size:${font}px; margin-top:0;`;
-
-        landRowsContainer.innerHTML = "";
-        lands.forEach((r) => {
-          const row = document.createElement("div");
-          row.className = "land-row";
-
-          const cells = [
-            r.district ?? "",
-            r.taluka ?? "",
-            r.village ?? "",
-            r.gatNo ?? "",
-            r.khateNo ?? "",
-            r.area ?? ""
-          ];
-
-          cells.forEach((val) => {
-            const cell = document.createElement("div");
-            cell.className = "land-cell";
-            cell.style.cssText = cellStyle;
-            cell.textContent = (val ?? "").toString();
-            row.appendChild(cell);
-          });
-
-          landRowsContainer.appendChild(row);
-        });
-      }
-
-      return node;
-    }
-
-    function render() {
-      // Sync hidden DOB (dd-mm-yyyy) from calendar picker (yyyy-mm-dd)
-      const dobDate = form.elements.dobDate ? form.elements.dobDate.value : "";
-      const hiddenDob = form.elements.dob;
-      if (hiddenDob) hiddenDob.value = formatDobDDMMYYYY(dobDate);
-
-      // Sync Aadhaar formatting into the input for preview/QR
-      const aadhaarInput = form.elements.aadhaar;
-      if (aadhaarInput) aadhaarInput.value = formatAadhaar(aadhaarInput.value);
-
-      // Sync Card Number formatting into the input for preview/QR
-      const cardInput = form.elements.cardNumber;
-      if (cardInput) cardInput.value = formatCardNumber(cardInput.value);
-
-      frontPreview.innerHTML = "";
-      backPreview.innerHTML = "";
-      frontPreview.appendChild(makeCard(frontTemplate, formData()));
-      backPreview.appendChild(makeCard(backTemplate, formData()));
-    }
-
-    function loadPhoto(file) {
-      if (!file) { photoDataUrl = ""; render(); return; }
-      const reader = new FileReader();
-      reader.onload = () => { photoDataUrl = reader.result; render(); };
-      reader.readAsDataURL(file);
-    }
-
-    async function cardCanvas(card) {
-      return html2canvas(card, { scale: 2, backgroundColor: null, useCORS: true, logging: false });
-    }
-
-    // async function downloadPdf() {
-    //   if (!window.html2canvas || !window.jspdf) {
-    //     alert("PDF libraries are not loaded. Please connect to the internet and refresh this page once, then try Download PDF again.");
-    //     return;
-    //   }
-    //   downloadBtn.disabled = true;
-    //   downloadBtn.textContent = "Creating PDF...";
-    //   const data = formData();
-    //   printStack.innerHTML = "";
-    //   const front = makeCard(frontTemplate, data);
-    //   const back = makeCard(backTemplate, data);
-    //   printStack.append(front, back);
-    //   await new Promise((resolve) => setTimeout(resolve, 250));
-    //   const { jsPDF } = window.jspdf;
-    //   const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: [101.6,152.4] });
-    //   const frontCanvas = await cardCanvas(front);
-    //   const backCanvas = await cardCanvas(back);
-    //   pdf.addImage(frontCanvas.toDataURL("image/png"), "PNG", 0, 0, 1008, 650);
-    //   pdf.addPage([1008, 650], "landscape");
-    //   pdf.addImage(backCanvas.toDataURL("image/png"), "PNG", 0, 0, 1008, 650);
-    //   const name = (data.englishName || "Farmer").trim().replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase();
-    //   pdf.save(`${name || "Farmer"}-card.pdf`);
-    //   printStack.innerHTML = "";
-    //   downloadBtn.disabled = false;
-    //   downloadBtn.textContent = "Download PDF";
-    // }
-async function downloadPdf() {
-    if (!window.html2canvas || !window.jspdf) {
-        alert("PDF libraries are not loaded.");
-        return;
-    }
-
-    downloadBtn.disabled = true;
-    downloadBtn.textContent = "Creating PDF...";
-
-    const data = formData();
-
-    printStack.innerHTML = "";
-
-    const front = makeCard(frontTemplate, data);
-    const back = makeCard(backTemplate, data);
-
-    printStack.append(front, back);
-
-    // Wait for QR code and images
-    await new Promise(resolve => setTimeout(resolve, 300));
-
-    const frontCanvas = await cardCanvas(front);
-    const backCanvas = await cardCanvas(back);
-
-    const { jsPDF } = window.jspdf;
-
-    // 4 × 6 inch Portrait Paper
-    const pdf = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: [152.4, 101.6]
-    });
-
-    // PVC Card Size
-    const cardWidth = 85.60;
-    const cardHeight = 53.98;
-
-    // Center Horizontally
-    const x = (101.6 - cardWidth) / 2;
-
-    // Vertical Positions
-    const topMargin = 8;
-    const gap = 8;
-
-    // FRONT CARD
-    pdf.addImage(
-        frontCanvas.toDataURL("image/png"),
-        "PNG",
-        x,
-        topMargin,
-        cardWidth,
-        cardHeight
-    );
-
-    // BACK CARD
-    pdf.addImage(
-        backCanvas.toDataURL("image/png"),
-        "PNG",
-        x,
-        topMargin + cardHeight + gap,
-        cardWidth,
-        cardHeight
-    );
-
-    const name = (data.englishName || "Farmer")
-        .trim()
-        .replace(/[^a-z0-9]+/gi, "-")
-        .replace(/^-|-$/g, "")
-        .toLowerCase();
-
-    pdf.save(`${name || "Farmer"}-card.pdf`);
-
-    printStack.innerHTML = "";
-
-    downloadBtn.disabled = false;
-    downloadBtn.textContent = "Download PDF";
-}
-
-    form.addEventListener("input", (event) => {
-      if (event.target.name === "aadhaar") event.target.value = formatAadhaar(event.target.value);
-      if (event.target.name === "cardNumber") event.target.value = formatCardNumber(event.target.value);
-      if (event.target.name === "dobDate") render();
-      if (event.target.name !== "photo" && event.target.name !== "dobDate") render();
-    });
-
-    function createLandRowHtml(index, values) {
-      const v = values || {};
-      return `
-        <label>District <input name="lands[${index}][district]" value="${(v.district ?? '').toString().replace(/"/g,'"')}"></label>
-        <label>Taluka <input name="lands[${index}][taluka]" value="${(v.taluka ?? '').toString().replace(/"/g,'"')}"></label>
-        <label>Village <input name="lands[${index}][village]" value="${(v.village ?? '').toString().replace(/"/g,'"')}"></label>
-        <label>Gat No. <input name="lands[${index}][gatNo]" value="${(v.gatNo ?? '').toString().replace(/"/g,'"')}"></label>
-        <label>Khate No. <input name="lands[${index}][khateNo]" value="${(v.khateNo ?? '').toString().replace(/"/g,'"')}"></label>
-        <label>Area H.R. <input name="lands[${index}][area]" value="${(v.area ?? '').toString().replace(/"/g,'"')}"></label>
-      `;
-    }
-
-    const landRowsEl = document.getElementById("landRows");
-    const addLandRowBtn = document.getElementById("addLandRowBtn");
-
-    function initLandRows() {
-      // default: keep original 6 values for first row
-      landRowsEl.innerHTML = "";
-      landRowsEl.insertAdjacentHTML("beforeend", createLandRowHtml(0, {
-        district: "अहिल्यानगर",
-        taluka: "अकोले",
-        village: "ब्राम्हणवाडा",
-        gatNo: "",
-        khateNo: "",
-        area: ""
-      }));
-      addLandRowBtn.disabled = false;
-    }
-
-    addLandRowBtn.addEventListener("click", () => {
-      const currentCount = landRowsEl.querySelectorAll("input[name^='lands[']").length / 6;
-      const nextIndex = Math.max(0, Math.round(currentCount));
-      landRowsEl.insertAdjacentHTML("beforeend", createLandRowHtml(nextIndex, {
-        district: "",
-        taluka: "",
-        village: "",
-        gatNo: "",
-        khateNo: "",
-        area: ""
-      }));
-      render();
-    });
-
-    form.photo.addEventListener("change", (event) => { loadPhoto(event.target.files[0]); });
-    if (form.elements.dobDate) {
-      form.elements.dobDate.addEventListener("change", () => { render(); });
-    }
-
-    resetBtn.addEventListener("click", () => {
-      form.reset();
-      photoDataUrl = "";
-      initLandRows();
-      render();
-    });
-
-    form.addEventListener("submit", (e) => e.preventDefault());
-
-    downloadBtn.addEventListener("click", async () => {
-      const aadhaarOk = isValidAadhaar(form.elements.aadhaar.value);
-      if (!aadhaarOk) {
-        alert("Aadhaar No must contain exactly 12 digits (format: 4 digits + space + 4 digits + space + 4 digits).");
-        return;
-      }
-
-      const cardOk = isValidCardNumber(form.elements.cardNumber.value);
-      if (!cardOk) {
-        alert("Card Number must contain exactly 11 digits (format: 4 digits + space + 4 digits + space + 3 digits).");
-        return;
-      }
-
-      await downloadPdf();
-    });
-
-    initLandRows();
-    render();
-  </script>
+  <script src="script.js"></script>
 </body>
 </html>
