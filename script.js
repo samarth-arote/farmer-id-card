@@ -73,6 +73,8 @@ function initViewModeControls() {
     btnBoth.classList.remove("active");
     singleContainer.classList.remove("hidden");
     bothContainer.classList.add("hidden");
+    const previewPanel = document.querySelector(".preview-panel");
+    if (previewPanel) previewPanel.style.overflowY = "hidden";
     if (noteText) noteText.textContent = "";
     updateCardScale();
   });
@@ -85,6 +87,8 @@ function initViewModeControls() {
       btnBoth.classList.remove("active");
       singleContainer.classList.remove("hidden");
       bothContainer.classList.add("hidden");
+      const previewPanel = document.querySelector(".preview-panel");
+      if (previewPanel) previewPanel.style.overflowY = "hidden";
       if (noteText) noteText.textContent = "360° Multi-Axis Orbit Spin 🔄";
       updateCardScale();
       startAutoSpinLoop();
@@ -99,6 +103,8 @@ function initViewModeControls() {
     if (btnSpin) btnSpin.classList.remove("active");
     bothContainer.classList.remove("hidden");
     singleContainer.classList.add("hidden");
+    const previewPanel = document.querySelector(".preview-panel");
+    if (previewPanel) previewPanel.style.overflowY = "auto";
     if (noteText) noteText.textContent = "Interactive 3D preview • Move mouse over card to tilt";
     updateCardScale();
   });

@@ -585,6 +585,9 @@ input:focus, select:focus, textarea:focus {
   gap: 28px;
   align-items: center;
   width: 100%;
+  max-height: calc(100vh - 90px);
+  overflow-y: auto;
+  padding-bottom: 40px;
 }
 
 .card-shell {
