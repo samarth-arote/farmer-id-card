@@ -53,7 +53,8 @@ button, input, select, textarea {
 .app {
   display: grid;
   grid-template-columns: minmax(340px, 440px) 1fr;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
 }
 
 /* ==========================================================================
@@ -65,6 +66,7 @@ button, input, select, textarea {
   border-right: 1px solid var(--border-subtle);
   padding: 24px 22px;
   overflow-y: auto;
+  height: 100vh;
   box-shadow: 2px 0 16px rgba(0, 0, 0, 0.02);
 }
 
@@ -357,9 +359,12 @@ input:focus, select:focus, textarea:focus {
 
 .preview-panel {
   padding: 28px 24px;
-  overflow-y: auto;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
+  height: 100vh;
+  position: sticky;
+  top: 0;
 }
 
 .preview-toolbar {
