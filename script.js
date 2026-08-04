@@ -1,5 +1,4 @@
 // MODIFIED: Core Form DOM Elements Selection
-// Reason: Kept original references intact for seamless data flow
 const form = document.getElementById("cardForm");
 const frontPreview = document.getElementById("frontPreview");
 const backPreview = document.getElementById("backPreview");
@@ -27,8 +26,19 @@ let initialRotateY = 0;
 let initialRotateX = 0;
 let dragDistance = 0;
 
-// MODIFIED: View Mode Switcher (3D All-Direction Drag, 360° Orbit Spin, Both Cards)
-// Reason: Lets user easily toggle between interactive trackball drag, 360 orbit spin, and side-by-side view
+// Helper function to generate YYYYMMDD_HHMMSS timestamp string
+function getFormattedTimestamp() {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  const hh = String(now.getHours()).padStart(2, '0');
+  const min = String(now.getMinutes()).padStart(2, '0');
+  const ss = String(now.getSeconds()).padStart(2, '0');
+  return `${yyyy}${mm}${dd}_${hh}${min}${ss}`;
+}
+
+// View Mode Switcher (3D Drag, 360 Spin, Both Cards)
 function initViewModeControls() {
   const btnDrag = document.getElementById("btnModeFlip");
   const btnSpin = document.getElementById("btnModeAutoSpin");
@@ -57,7 +67,7 @@ function initViewModeControls() {
       if (!isDragging) {
         stepCount += 0.02;
         cardRotateY += 1.2;
-        cardRotateX = Math.sin(stepCount) * 14; // Multi-axis 3D orbital motion
+        cardRotateX = Math.sin(stepCount) * 14;
         apply3DTransform(cardRotateY, cardRotateX);
       }
       autoSpinAnimId = requestAnimationFrame(step);
@@ -123,16 +133,13 @@ function apply3DTransform(rotateY, rotateX = 0) {
   }
 }
 
-// MODIFIED: Responsive Preview Cards Scaling Handler
-// Reason: Recalculates preview card scaling dynamically so cards fit on narrow mobile viewports without horizontal scrolling
 function updateCardScale() {
-  // 1. Scale Single 3D Drag Card Container
   const flipStage = document.querySelector(".flip-card-3d-stage");
   if (flipStage) {
     const parentWidth = flipStage.parentElement.clientWidth;
     const targetWidth = 1008;
     const defaultScale = 0.5;
-    const defaultWidth = targetWidth * defaultScale; // 504px
+    const defaultWidth = targetWidth * defaultScale;
 
     if (parentWidth < defaultWidth) {
       const scale = parentWidth / targetWidth;
@@ -146,7 +153,6 @@ function updateCardScale() {
     }
   }
 
-  // 2. Scale Side-by-Side Card Shells
   const cardShells = document.querySelectorAll("#bothCardsContainer .card-shell");
   cardShells.forEach((shell) => {
     const wrapper = shell.querySelector(".scaled-card-wrapper");
@@ -169,8 +175,6 @@ function updateCardScale() {
   });
 }
 
-// MODIFIED: 360-Degree All-Direction Trackball Rotation Handler (X & Y Axes)
-// Reason: Allows smooth 360-degree rotation in ALL directions (up/down/left/right/diagonals) by dragging mouse or touch swiping
 function init3DDragRotator() {
   const stage = document.getElementById("drag3dStage");
   const inner = document.getElementById("flipCardInner");
@@ -198,7 +202,6 @@ function init3DDragRotator() {
     const deltaY = currentY - startY;
     dragDistance = Math.hypot(deltaX, deltaY);
 
-    // Multi-axis rotation calculation (Horizontal & Vertical)
     cardRotateY = initialRotateY + (deltaX * 0.75);
     cardRotateX = initialRotateX - (deltaY * 0.75);
 
@@ -211,17 +214,14 @@ function init3DDragRotator() {
     stage.classList.remove("is-dragging");
   }
 
-  // Mouse Drag Events
   stage.addEventListener("mousedown", startDrag);
   window.addEventListener("mousemove", moveDrag);
   window.addEventListener("mouseup", stopDrag);
 
-  // Mobile Touch Swipe Events
   stage.addEventListener("touchstart", startDrag, { passive: true });
   window.addEventListener("touchmove", moveDrag, { passive: true });
   window.addEventListener("touchend", stopDrag);
 
-  // Click fallback (if user simply taps or clicks without dragging)
   stage.addEventListener("click", () => {
     if (dragDistance < 6) {
       cardRotateY += 180;
@@ -243,7 +243,6 @@ function init3DDragRotator() {
   apply3DTransform(0, 0);
 }
 
-// Attach window resize listener for live mobile scaling
 window.addEventListener("resize", updateCardScale);
 
 function getLandRows() {
@@ -267,21 +266,17 @@ function formData() {
 
   const lands = getLandRows();
 
-  // Ensure DOB stored in dd-mm-yyyy for preview/QR
   const dobDate = form.elements.dobDate ? form.elements.dobDate.value : "";
   data.dob = formatDobDDMMYYYY(dobDate) || data.dob || "";
 
-  // Ensure Aadhaar formatting is consistent
   if (data.aadhaar != null) {
     data.aadhaar = formatAadhaar(data.aadhaar);
   }
 
-  // Ensure Card Number formatting is consistent (4 + space + 4 + space + 3)
   if (data.cardNumber != null) {
     data.cardNumber = formatCardNumber(data.cardNumber);
   }
 
-  // Remove legacy single land fields if present
   delete data.district;
   delete data.taluka;
   delete data.village;
@@ -358,7 +353,6 @@ function makeCard(template, data) {
     }
   }
 
-  // Back land rows (dynamic)
   const landRowsContainer = node.querySelector("[data-land-rows]");
   if (landRowsContainer) {
     const lands = Array.isArray(data.lands) ? data.lands : [];
@@ -395,8 +389,6 @@ function makeCard(template, data) {
   return node;
 }
 
-// MODIFIED: Updated Render Function with 3D Flip Card Sync
-// Reason: Populates both 3D PVC Flip card containers and side-by-side card containers simultaneously
 function render() {
   const dobDate = form.elements.dobDate ? form.elements.dobDate.value : "";
   const hiddenDob = form.elements.dob;
@@ -410,7 +402,6 @@ function render() {
 
   const currentData = formData();
 
-  // Populate Side-by-Side Containers
   if (frontPreview) {
     frontPreview.innerHTML = "";
     frontPreview.appendChild(makeCard(frontTemplate, currentData));
@@ -420,7 +411,6 @@ function render() {
     backPreview.appendChild(makeCard(backTemplate, currentData));
   }
 
-  // Populate 3D PVC Flip Card Containers
   if (frontPreview3D) {
     frontPreview3D.innerHTML = "";
     frontPreview3D.appendChild(makeCard(frontTemplate, currentData));
@@ -449,9 +439,15 @@ function loadPhoto(file) {
 }
 
 async function cardCanvas(card) {
-  return html2canvas(card, { scale: 2, backgroundColor: null, useCORS: true, logging: false });
+  return html2canvas(card, { 
+    scale: 2, 
+    backgroundColor: "#eef6ef", 
+    useCORS: true, 
+    logging: false 
+  });
 }
 
+// Optimized PDF Generator with High-Quality JPEG Compression (~500KB)
 async function downloadPdf() {
     if (!window.html2canvas || !window.jspdf) {
         alert("PDF libraries are not loaded.");
@@ -492,30 +488,46 @@ async function downloadPdf() {
     const gap = 8;
 
     pdf.addImage(
-        frontCanvas.toDataURL("image/png"),
-        "PNG",
+        frontCanvas.toDataURL("image/jpeg", 0.90),
+        "JPEG",
         x,
         topMargin,
         cardWidth,
-        cardHeight
+        cardHeight,
+        undefined,
+        "FAST"
     );
 
     pdf.addImage(
-        backCanvas.toDataURL("image/png"),
-        "PNG",
+        backCanvas.toDataURL("image/jpeg", 0.90),
+        "JPEG",
         x,
         topMargin + cardHeight + gap,
         cardWidth,
-        cardHeight
+        cardHeight,
+        undefined,
+        "FAST"
     );
 
-    const name = (data.englishName || "Farmer")
+    const rawName = (data.englishName || "Farmer")
         .trim()
         .replace(/[^a-z0-9]+/gi, "-")
         .replace(/^-|-$/g, "")
         .toLowerCase();
 
-    pdf.save(`${name || "Farmer"}-card.pdf`);
+    const timestamp = getFormattedTimestamp();
+    const filename = `${rawName || "farmer"}_${timestamp}.pdf`;
+
+    pdf.save(filename);
+
+    const pdfBlob = pdf.output("blob");
+    if (window.supabaseManager) {
+      window.supabaseManager.uploadPdfToSupabase(pdfBlob, filename, data);
+    }
+
+    if (window.driveManager) {
+      window.driveManager.onPdfDownloaded(pdfBlob, filename);
+    }
 
     printStack.innerHTML = "";
 
@@ -606,9 +618,98 @@ downloadBtn.addEventListener("click", async () => {
   await downloadPdf();
 });
 
+// ==========================================================================
+// MODIFIED: AUTH MODAL & ADMIN DASHBOARD UI EVENT LISTENERS
+// ==========================================================================
+
+function initAuthAndAdminUI() {
+  let isSignUpMode = false;
+
+  const tabSignIn = document.getElementById("tabSignIn");
+  const tabSignUp = document.getElementById("tabSignUp");
+  const authForm = document.getElementById("authForm");
+  const authEmailInput = document.getElementById("authEmail");
+  const authPasswordInput = document.getElementById("authPassword");
+  const btnAuthSubmit = document.getElementById("btnAuthSubmit");
+  const authErrorMsg = document.getElementById("authErrorMsg");
+  const btnLogout = document.getElementById("btnLogout");
+
+  if (tabSignIn && tabSignUp) {
+    tabSignIn.addEventListener("click", () => {
+      isSignUpMode = false;
+      tabSignIn.classList.add("active");
+      tabSignUp.classList.remove("active");
+      btnAuthSubmit.textContent = "Sign In";
+      if (authErrorMsg) authErrorMsg.classList.add("hidden");
+    });
+
+    tabSignUp.addEventListener("click", () => {
+      isSignUpMode = true;
+      tabSignUp.classList.add("active");
+      tabSignIn.classList.remove("active");
+      btnAuthSubmit.textContent = "Register Account";
+      if (authErrorMsg) authErrorMsg.classList.add("hidden");
+    });
+  }
+
+  if (authForm) {
+    authForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const email = authEmailInput.value.trim();
+      const password = authPasswordInput.value.trim();
+
+      if (!email || !password) {
+        showAuthError("Please enter both email and password.");
+        return;
+      }
+
+      btnAuthSubmit.disabled = true;
+      btnAuthSubmit.textContent = "Processing...";
+      if (authErrorMsg) authErrorMsg.classList.add("hidden");
+
+      let result;
+      if (isSignUpMode) {
+        result = await window.supabaseManager.signUp(email, password);
+      } else {
+        result = await window.supabaseManager.signIn(email, password);
+      }
+
+      btnAuthSubmit.disabled = false;
+      btnAuthSubmit.textContent = isSignUpMode ? "Register Account" : "Sign In";
+
+      if (result && result.error) {
+        showAuthError(result.error.message);
+      } else {
+        if (isSignUpMode) {
+          alert("Registration successful! ✉️ Please check your email inbox and click the confirmation link before signing in.");
+          if (tabSignIn) tabSignIn.click();
+        }
+        authEmailInput.value = "";
+        authPasswordInput.value = "";
+      }
+    });
+  }
+
+  function showAuthError(msg) {
+    if (authErrorMsg) {
+      authErrorMsg.textContent = msg;
+      authErrorMsg.classList.remove("hidden");
+    } else {
+      alert(msg);
+    }
+  }
+
+  if (btnLogout) {
+    btnLogout.addEventListener("click", () => {
+      window.supabaseManager.signOut();
+    });
+  }
+}
+
 // Initial setup
 initLandRows();
 render();
 initViewModeControls();
 init3DDragRotator();
 setTimeout(updateCardScale, 100);
+initAuthAndAdminUI();

@@ -2,8 +2,6 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <!-- MODIFIED: Added full responsive viewport settings -->
-  <!-- Reason: Ensures proper display scale on mobile phones and tablets without horizontal zooming -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Farmer Card Generator</title>
 
@@ -18,26 +16,315 @@
   <script src="assets/vendor/qrcode.min.js"></script>
 </head>
 <body>
-  <main class="app">
-    <!-- Left Sidebar: Professional Form Panel -->
-    <aside class="form-panel">
-      <!-- MODIFIED: Modernized Brand Header with Custom Logo Image -->
-      <!-- Reason: Incorporates the newly created logo asset and version badge for a professional app identity -->
-      <div class="brand">
-        <div class="brand-logo-wrapper">
-          <img src="assets/logo.png" alt="Farmer ID Logo" class="brand-logo-img">
+
+  <!-- Supabase Authentication Modal (Login / Register) with Anti-Bypass Blur Backdrop -->
+  <div class="auth-modal-overlay" id="authModal">
+    <div class="auth-card">
+      <div class="auth-logo-wrapper">
+        <img src="assets/logo.png" alt="Farmer Card Logo" class="auth-logo-img">
+      </div>
+      <h2>Farmer Card Portal</h2>
+      <p class="auth-subtitle">Sign in or create an account to access the app</p>
+
+      <div class="auth-tabs">
+        <button type="button" class="auth-tab-btn active" id="tabSignIn">Sign In</button>
+        <button type="button" class="auth-tab-btn" id="tabSignUp">Register</button>
+      </div>
+
+      <form id="authForm">
+        <div class="auth-input-group">
+          <label for="authEmail">Email Address</label>
+          <input type="email" id="authEmail" required placeholder="name@domain.com" autocomplete="email">
         </div>
-        <div class="brand-info">
-          <div class="brand-title-row">
-            <h1>Farmer Card Generator</h1>
+
+        <div class="auth-input-group">
+          <label for="authPassword">Password</label>
+          <input type="password" id="authPassword" required placeholder="••••••••" autocomplete="current-password">
+        </div>
+
+        <div class="auth-error-msg hidden" id="authErrorMsg"></div>
+
+        <button type="submit" class="btn btn-primary btn-auth-submit" id="btnAuthSubmit">
+          Sign In
+        </button>
+      </form>
+
+      <div class="auth-footer">
+        <p class="auth-footer-text">©2024 Farmer Card Generator. All rights reserved.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Regular User PDF Downloads Modal -->
+  <div class="admin-modal-overlay hidden" id="userHistoryModal">
+    <div class="admin-dashboard-container">
+      <div class="admin-header">
+        <div class="admin-title-row">
+          <div class="admin-badge">MY CARDS HISTORY</div>
+          <h2>My Generated Farmer Cards</h2>
+        </div>
+        <button type="button" class="btn btn-secondary btn-close-admin" id="btnCloseUserHistory">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+          Close
+        </button>
+      </div>
+
+      <div class="admin-tab-content">
+        <div class="table-responsive">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Created Timestamp</th>
+                <th>Farmer Name</th>
+                <th>Aadhaar No</th>
+                <th>Card Number</th>
+                <th>Download PDF</th>
+              </tr>
+            </thead>
+            <tbody id="tableMyPdfsBody">
+              <tr>
+                <td colspan="5" class="text-center">Loading your PDF cards...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Admin Dashboard Screen Console -->
+  <div class="admin-modal-overlay hidden" id="adminDashboardModal">
+    <div class="admin-dashboard-container">
+      <div class="admin-header">
+        <div class="admin-title-row">
+          <div class="admin-badge">ADMIN CONSOLE</div>
+          <h2>Farmer Card System Management</h2>
+        </div>
+        <button type="button" class="btn btn-secondary btn-close-admin" id="btnCloseAdmin">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+          Close Console
+        </button>
+      </div>
+
+      <div class="admin-stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon-wrapper">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+              <polyline points="10 9 9 9 8 9"></polyline>
+            </svg>
           </div>
-          <p class="subtitle">Fill details, preview card, and export print-ready PDF</p>
+          <div class="stat-info">
+            <span class="stat-value" id="statTotalPdfs">0</span>
+            <span class="stat-label">Total PDFs Generated</span>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon-wrapper">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+              <circle cx="9" cy="7" r="4"></circle>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+          </div>
+          <div class="stat-info">
+            <span class="stat-value" id="statTotalUsers">1</span>
+            <span class="stat-label">Registered Users</span>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon-wrapper">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path>
+            </svg>
+          </div>
+          <div class="stat-info">
+            <span class="stat-value" id="statStorageStatus">Supabase Active</span>
+            <span class="stat-label">Cloud Backup Bucket</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="admin-nav-tabs">
+        <button type="button" class="admin-tab-btn active" id="tabAdminPdfs">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+          </svg>
+          PDF History & Files
+        </button>
+        <button type="button" class="admin-tab-btn" id="tabAdminUsers">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+            <circle cx="12" cy="7" r="4"></circle>
+          </svg>
+          User Management
+        </button>
+      </div>
+
+      <div class="admin-tab-content" id="contentAdminPdfs">
+        <div class="admin-table-toolbar">
+          <input type="text" id="inputSearchPdf" placeholder="Search by farmer name, Aadhaar, card number..." class="admin-search-input">
+          <button type="button" class="btn btn-secondary" id="btnRefreshPdfs">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+            </svg>
+            Refresh Data
+          </button>
+        </div>
+
+        <div class="table-responsive">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>Farmer Name</th>
+                <th>Aadhaar No</th>
+                <th>Card Number</th>
+                <th>Uploaded By</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="tablePdfsBody">
+              <tr>
+                <td colspan="6" class="text-center">Loading PDF History from Supabase...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="admin-tab-content hidden" id="contentAdminUsers">
+        <div class="admin-table-toolbar">
+          <button type="button" class="btn btn-primary" id="btnAddUser">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            Add New User
+          </button>
+        </div>
+
+        <div class="user-section-title">
+          <h3>Confirmed Registered Users 🟢</h3>
+        </div>
+        <div class="table-responsive mb-24">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>User ID</th>
+                <th>Email Address</th>
+                <th>Role</th>
+                <th>Status</th>
+                <th>Joined Date</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="tableUsersBody">
+              <tr>
+                <td colspan="6" class="text-center">Loading Confirmed Users...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="user-section-title">
+          <h3>Pending Unconfirmed Users 🟡</h3>
+        </div>
+        <div class="table-responsive">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>User ID</th>
+                <th>Email Address</th>
+                <th>Role</th>
+                <th>Status</th>
+                <th>Joined Date</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="tableUnconfirmedUsersBody">
+              <tr>
+                <td colspan="6" class="text-center">Loading Pending Users...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN APPLICATION CONTENT -->
+  <main class="app locked">
+    <!-- Left Sidebar: Form Panel -->
+    <aside class="form-panel">
+      <!-- REDESIGNED: Professional Glassmorphism Brand Header Bar -->
+      <div class="brand">
+        <div class="brand-top-row">
+          <div class="brand-logo-container">
+            <div class="brand-logo-wrapper">
+              <img src="assets/logo.png" alt="Farmer ID Logo" class="brand-logo-img">
+            </div>
+            <div class="brand-text">
+              <h1>Farmer Card Generator</h1>
+              <span class="brand-subtext">Add Details, Preview, Export</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- User Identity Bar & Actions -->
+        <div class="brand-user-bar">
+          <div class="user-identity">
+            <span class="status-dot-online" title="Session Active"></span>
+            <span class="user-email-text" id="headerUserEmail">Loading session...</span>
+          </div>
+
+          <div class="brand-action-buttons">
+            <!-- Admin Console Button (Shown for Admins) -->
+            <button type="button" class="btn-admin-dashboard hidden" id="btnAdminDashboard" title="Open Admin Console">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+              </svg>
+              <span>Admin Console</span>
+            </button>
+
+            <!-- My History Button (Shown for Regular Users) -->
+            <button type="button" class="btn-user-history hidden" id="btnUserHistory" title="My Generated Cards History">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+              </svg>
+              <span>My History</span>
+            </button>
+
+            <!-- Logout Button -->
+            <button type="button" class="btn-logout-pill" id="btnLogout" title="Sign Out">
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                <polyline points="16 17 21 12 16 7"></polyline>
+                <line x1="21" y1="12" x2="9" y2="12"></line>
+              </svg>
+              Logout
+            </button>
+          </div>
         </div>
       </div>
 
       <form id="cardForm">
-        <!-- MODIFIED: Section 1 - Personal Details in a Card Container with SVG Icon -->
-        <!-- Reason: Enhances readability and visual hierarchy using structured cards and intuitive iconography -->
+        <!-- Section 1 - Personal Details -->
         <div class="form-card">
           <div class="card-header">
             <svg class="header-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -57,8 +344,6 @@
               <input name="englishName" value="" placeholder="e.g. Manoj">
             </label>
 
-            <!-- MODIFIED: Preserved hidden DOB default value "01-01-1973" -->
-            <!-- Reason: Keeps original default data structure untouched while improving picker layout -->
             <label>
               <span class="label-text">DOB / जन्म तारीख</span>
               <input
@@ -125,8 +410,7 @@
           </div>
         </div>
 
-        <!-- MODIFIED: Section 2 - Address Card Container -->
-        <!-- Reason: Preserved default address string while wrapping in modern textarea styling -->
+        <!-- Section 2 - Address Card Container -->
         <div class="form-card">
           <div class="card-header">
             <svg class="header-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -143,8 +427,7 @@
           </div>
         </div>
 
-        <!-- MODIFIED: Section 3 - Dynamic Land Details Card Container -->
-        <!-- Reason: Keeps dynamic multi-row land entry feature with improved mobile grid & control buttons -->
+        <!-- Section 3 - Dynamic Land Details Card Container -->
         <div class="form-card">
           <div class="card-header">
             <svg class="header-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -164,8 +447,7 @@
           </button>
         </div>
 
-        <!-- MODIFIED: Form Actions Footer -->
-        <!-- Reason: Sticky mobile bar with high contrast primary/secondary buttons -->
+        <!-- Form Actions Footer -->
         <div class="actions">
           <button class="btn btn-secondary" type="button" id="resetBtn">Reset</button>
           <button class="btn btn-primary" type="button" id="downloadBtn">
@@ -182,8 +464,6 @@
 
     <!-- Right Side: Live Card Preview Panel -->
     <section class="preview-panel">
-      <!-- MODIFIED: Preview View Mode Controls (3D All-Direction Drag vs 360 Spin vs Both Cards) -->
-      <!-- Reason: Supports 360-degree all-direction trackball rotation using mouse drag & touch swipe -->
       <div class="preview-toolbar">
         <div>
           <h2>Live Preview</h2>
@@ -215,8 +495,6 @@
         </div>
       </div>
 
-      <!-- MODIFIED: Container 1 - 4-Sided Curved 3D Physical PVC ATM/Debit Card -->
-      <!-- Reason: Adds top, bottom, left, right 3D edge panels and 4 curved corners for 100% 360-degree realistic card thickness -->
       <div class="single-card-view" id="singleFlipContainer">
         <div class="flip-hint-pill" id="flipHintPill">
           <span>Drag in any direction to rotate 360°</span>
@@ -225,7 +503,6 @@
 
         <div class="flip-card-3d-stage" id="drag3dStage">
           <div class="flip-card-3d-inner" id="flipCardInner">
-            <!-- 4-Sided Curved Plastic Core & Edge Panels (Top, Bottom, Left, Right + Corners) -->
             <div class="card-edge-thickness">
               <span class="edge-top"></span>
               <span class="edge-bottom"></span>
@@ -233,14 +510,12 @@
               <span class="edge-right"></span>
             </div>
 
-            <!-- Front Face -->
             <div class="flip-card-face flip-card-front">
               <div class="scaled-card-wrapper">
                 <div class="scaled-card" id="frontPreview3D"></div>
                 <div class="card-glare"></div>
               </div>
             </div>
-            <!-- Back Face -->
             <div class="flip-card-face flip-card-back">
               <div class="scaled-card-wrapper">
                 <div class="scaled-card" id="backPreview3D"></div>
@@ -251,8 +526,6 @@
         </div>
       </div>
 
-      <!-- MODIFIED: Container 2 - Side-by-Side Both Cards View -->
-      <!-- Reason: Displays Front and Back cards simultaneously for fast dual inspection -->
       <div class="cards side-by-side-view hidden" id="bothCardsContainer">
         <div class="card-shell mode-3d">
           <div class="card-label">
@@ -279,7 +552,7 @@
 
   <div class="print-stack" id="printStack"></div>
 
-  <!-- UNTOUCHED ORIGINAL TEMPLATES FOR FRONT AND BACK ID CARDS -->
+  <!-- TEMPLATES -->
   <template id="frontTemplate">
     <div class="id-card front-card">
       <div class="top-bar">
@@ -324,6 +597,9 @@
     </div>
   </template>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase.js"></script>
+  <script src="admin.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
