@@ -12,6 +12,7 @@ const downloadBtn = document.getElementById("downloadBtn");
 const resetBtn = document.getElementById("resetBtn");
 
 let photoDataUrl = "";
+let currentEditingRecord = null;
 let currentViewMode = "drag"; // 'drag', 'spin', or 'both'
 
 // 3D All-Direction Trackball Rotation State (X and Y axes)
@@ -522,7 +523,15 @@ async function downloadPdf() {
 
     const pdfBlob = pdf.output("blob");
     if (window.supabaseManager) {
-      window.supabaseManager.uploadPdfToSupabase(pdfBlob, filename, data);
+      window.supabaseManager.uploadPdfToSupabase(pdfBlob, filename, data).then((res) => {
+        if (res && res.dbData && res.dbData[0]) {
+          try {
+            const fullMeta = { ...data, photoDataUrl: photoDataUrl || "" };
+            localStorage.setItem(`farmer_card_meta_${res.dbData[0].id}`, JSON.stringify(fullMeta));
+            localStorage.setItem(`farmer_card_meta_${filename}`, JSON.stringify(fullMeta));
+          } catch (e) {}
+        }
+      });
     }
 
     if (window.driveManager) {
@@ -602,6 +611,215 @@ resetBtn.addEventListener("click", () => {
 
 form.addEventListener("submit", (e) => e.preventDefault());
 
+// ==========================================================================
+// EDIT MODE & PDF REPLACEMENT LOGIC
+// ==========================================================================
+
+function showReplacePdfModal() {
+  const modal = document.getElementById("replacePdfModal");
+  if (modal) {
+    modal.classList.remove("hidden");
+  } else {
+    if (confirm("This pdf will be replaced with old that will be not undo. Do you want to proceed?")) {
+      proceedWithReplacePdf();
+    }
+  }
+}
+
+function hideReplacePdfModal() {
+  const modal = document.getElementById("replacePdfModal");
+  if (modal) modal.classList.add("hidden");
+}
+
+window.startEditPdfRecord = function(record) {
+  currentEditingRecord = record;
+
+  const banner = document.getElementById("editModeBanner");
+  const bannerTitle = document.getElementById("editBannerTitle");
+  if (banner) banner.classList.remove("hidden");
+  if (bannerTitle) {
+    bannerTitle.textContent = `Modifying: ${record.english_name || "Farmer"} (Card: ${record.card_number || "N/A"})`;
+  }
+
+  if (downloadBtn) {
+    downloadBtn.innerHTML = `
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+        <polyline points="17 21 17 13 7 13 7 21"></polyline>
+        <polyline points="7 3 7 8 15 8"></polyline>
+      </svg>
+      Update & Replace PDF
+    `;
+    downloadBtn.classList.add("btn-edit-mode");
+  }
+
+  // Look for stored metadata in localStorage
+  let meta = null;
+  try {
+    const raw = (record.id && localStorage.getItem(`farmer_card_meta_${record.id}`)) ||
+                (record.storage_path && localStorage.getItem(`farmer_card_meta_${record.storage_path}`)) ||
+                (record.filename && localStorage.getItem(`farmer_card_meta_${record.filename}`));
+    if (raw) meta = JSON.parse(raw);
+  } catch (e) {}
+
+  if (form.elements.marathiName) form.elements.marathiName.value = record.marathi_name || (meta && meta.marathiName) || "";
+  if (form.elements.englishName) form.elements.englishName.value = record.english_name || (meta && meta.englishName) || "";
+  if (form.elements.aadhaar) form.elements.aadhaar.value = formatAadhaar(record.aadhaar || (meta && meta.aadhaar) || "");
+  if (form.elements.cardNumber) form.elements.cardNumber.value = formatCardNumber(record.card_number || (meta && meta.cardNumber) || "");
+  if (form.elements.mobile) form.elements.mobile.value = record.mobile || (meta && meta.mobile) || "";
+
+  if (meta) {
+    if (meta.gender && form.elements.gender) form.elements.gender.value = meta.gender;
+    if (meta.dob && form.elements.dob) form.elements.dob.value = meta.dob;
+    if (meta.dob && form.elements.dobDate) {
+      const parts = meta.dob.split("-");
+      if (parts.length === 3) {
+        form.elements.dobDate.value = `${parts[2]}-${parts[1]}-${parts[0]}`;
+      }
+    }
+    if (meta.address && form.elements.address) form.elements.address.value = meta.address;
+    if (meta.photoDataUrl) {
+      photoDataUrl = meta.photoDataUrl;
+      const photoNameSpan = document.getElementById("photoFileName");
+      if (photoNameSpan) photoNameSpan.textContent = "Saved Photo Loaded";
+    }
+    if (Array.isArray(meta.lands) && meta.lands.length > 0) {
+      landRowsEl.innerHTML = "";
+      meta.lands.forEach((l, idx) => {
+        landRowsEl.insertAdjacentHTML("beforeend", createLandRowHtml(idx, l));
+      });
+    }
+  }
+
+  render();
+
+  const formPanel = document.querySelector(".form-panel");
+  if (formPanel) formPanel.scrollTop = 0;
+};
+
+window.cancelEditPdfRecord = function() {
+  currentEditingRecord = null;
+  const banner = document.getElementById("editModeBanner");
+  if (banner) banner.classList.add("hidden");
+
+  if (downloadBtn) {
+    downloadBtn.innerHTML = `
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+        <polyline points="7 10 12 15 17 10"></polyline>
+        <line x1="12" y1="15" x2="12" y2="3"></line>
+      </svg>
+      Download PDF
+    `;
+    downloadBtn.classList.remove("btn-edit-mode");
+  }
+};
+
+async function proceedWithReplacePdf() {
+  if (!currentEditingRecord) return;
+
+  if (!window.html2canvas || !window.jspdf) {
+    alert("PDF libraries are not loaded.");
+    return;
+  }
+
+  downloadBtn.disabled = true;
+  downloadBtn.textContent = "Replacing PDF...";
+
+  const data = formData();
+
+  printStack.innerHTML = "";
+  const front = makeCard(frontTemplate, data);
+  const back = makeCard(backTemplate, data);
+  printStack.append(front, back);
+
+  await new Promise(resolve => setTimeout(resolve, 300));
+
+  const frontCanvas = await cardCanvas(front);
+  const backCanvas = await cardCanvas(back);
+
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({
+    orientation: "portrait",
+    unit: "mm",
+    format: [152.4, 101.6]
+  });
+
+  const cardWidth = 85.60;
+  const cardHeight = 53.98;
+  const x = (101.6 - cardWidth) / 2;
+  const topMargin = 8;
+  const gap = 8;
+
+  pdf.addImage(
+    frontCanvas.toDataURL("image/jpeg", 0.90),
+    "JPEG",
+    x,
+    topMargin,
+    cardWidth,
+    cardHeight,
+    undefined,
+    "FAST"
+  );
+
+  pdf.addImage(
+    backCanvas.toDataURL("image/jpeg", 0.90),
+    "JPEG",
+    x,
+    topMargin + cardHeight + gap,
+    cardWidth,
+    cardHeight,
+    undefined,
+    "FAST"
+  );
+
+  const filename = currentEditingRecord.filename || `${(data.englishName || "farmer").trim().toLowerCase().replace(/[^a-z0-9]+/gi, "-")}_updated.pdf`;
+
+  pdf.save(filename);
+
+  const pdfBlob = pdf.output("blob");
+
+  // Cache full updated form state in localStorage
+  try {
+    const fullMeta = { ...data, photoDataUrl: photoDataUrl || "" };
+    if (currentEditingRecord.id) {
+      localStorage.setItem(`farmer_card_meta_${currentEditingRecord.id}`, JSON.stringify(fullMeta));
+    }
+    if (currentEditingRecord.storage_path) {
+      localStorage.setItem(`farmer_card_meta_${currentEditingRecord.storage_path}`, JSON.stringify(fullMeta));
+    }
+    localStorage.setItem(`farmer_card_meta_${filename}`, JSON.stringify(fullMeta));
+  } catch (e) {}
+
+  if (window.supabaseManager) {
+    const res = await window.supabaseManager.replacePdfInSupabase(pdfBlob, currentEditingRecord, data);
+    if (res && res.success) {
+      alert("✅ PDF successfully updated & replaced! The old PDF has been permanently overwritten.");
+      if (window.adminConsole && window.adminConsole.cachedPdfList) {
+        const idx = window.adminConsole.cachedPdfList.findIndex(x => x.id === currentEditingRecord.id);
+        if (idx !== -1) {
+          window.adminConsole.cachedPdfList[idx] = {
+            ...window.adminConsole.cachedPdfList[idx],
+            english_name: data.englishName || window.adminConsole.cachedPdfList[idx].english_name,
+            marathi_name: data.marathiName || window.adminConsole.cachedPdfList[idx].marathi_name,
+            aadhaar: data.aadhaar || window.adminConsole.cachedPdfList[idx].aadhaar,
+            card_number: data.cardNumber || window.adminConsole.cachedPdfList[idx].card_number,
+            mobile: data.mobile || window.adminConsole.cachedPdfList[idx].mobile,
+            public_url: res.publicUrl || window.adminConsole.cachedPdfList[idx].public_url,
+          };
+        }
+      }
+    } else {
+      alert("PDF downloaded locally. Note: Cloud storage update had an issue.");
+    }
+  }
+
+  printStack.innerHTML = "";
+  downloadBtn.disabled = false;
+
+  window.cancelEditPdfRecord();
+}
+
 downloadBtn.addEventListener("click", async () => {
   const aadhaarOk = isValidAadhaar(form.elements.aadhaar.value);
   if (!aadhaarOk) {
@@ -612,6 +830,11 @@ downloadBtn.addEventListener("click", async () => {
   const cardOk = isValidCardNumber(form.elements.cardNumber.value);
   if (!cardOk) {
     alert("Card Number must contain exactly 11 digits (format: 4 digits + space + 4 digits + space + 3 digits).");
+    return;
+  }
+
+  if (currentEditingRecord) {
+    showReplacePdfModal();
     return;
   }
 
@@ -702,6 +925,29 @@ function initAuthAndAdminUI() {
   if (btnLogout) {
     btnLogout.addEventListener("click", () => {
       window.supabaseManager.signOut();
+    });
+  }
+
+  const btnCancelEdit = document.getElementById("btnCancelEdit");
+  if (btnCancelEdit) {
+    btnCancelEdit.addEventListener("click", () => {
+      window.cancelEditPdfRecord();
+    });
+  }
+
+  const btnCancelReplace = document.getElementById("btnCancelReplacePdf");
+  const btnConfirmReplace = document.getElementById("btnConfirmReplacePdf");
+
+  if (btnCancelReplace) {
+    btnCancelReplace.addEventListener("click", () => {
+      hideReplacePdfModal();
+    });
+  }
+
+  if (btnConfirmReplace) {
+    btnConfirmReplace.addEventListener("click", async () => {
+      hideReplacePdfModal();
+      await proceedWithReplacePdf();
     });
   }
 }

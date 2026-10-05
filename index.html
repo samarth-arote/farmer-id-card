@@ -271,6 +271,30 @@
     </div>
   </div>
 
+  <!-- Short Pop-up Confirmation Modal for Replacing PDF -->
+  <div class="confirm-modal-overlay hidden" id="replacePdfModal">
+    <div class="confirm-modal-card">
+      <div class="confirm-modal-icon">
+        <svg viewBox="0 0 24 24" width="38" height="38" fill="none" stroke="#dc2626" stroke-width="2.2">
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+          <line x1="12" y1="9" x2="12" y2="13"></line>
+          <line x1="12" y1="17" x2="12.01" y2="17"></line>
+        </svg>
+      </div>
+      <h3>Warning: Replace PDF</h3>
+      <p class="confirm-modal-msg">
+        This pdf will be replaced with old that will be not undo.
+      </p>
+      <p class="confirm-modal-sub">
+        The previous PDF file stored in cloud database will be permanently overwritten with your new modifications.
+      </p>
+      <div class="confirm-modal-actions">
+        <button type="button" class="btn btn-secondary" id="btnCancelReplacePdf">Cancel</button>
+        <button type="button" class="btn btn-danger" id="btnConfirmReplacePdf">Yes, Replace PDF</button>
+      </div>
+    </div>
+  </div>
+
   <!-- MAIN APPLICATION CONTENT -->
   <main class="app locked">
     <!-- Left Sidebar: Form Panel -->
@@ -325,6 +349,20 @@
             </button>
           </div>
         </div>
+      </div>
+
+      <!-- Active Edit Banner (visible when modifying from Admin Console) -->
+      <div class="edit-mode-banner hidden" id="editModeBanner">
+        <div class="edit-banner-content">
+          <span class="edit-badge">EDITING RECORD</span>
+          <div class="edit-banner-info">
+            <strong id="editBannerTitle">Modifying Farmer Card</strong>
+            <small>Changes will replace the existing PDF file in Supabase</small>
+          </div>
+        </div>
+        <button type="button" class="btn-cancel-edit" id="btnCancelEdit" title="Cancel edit">
+          Cancel Edit ✕
+        </button>
       </div>
 
       <form id="cardForm">

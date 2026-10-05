@@ -300,7 +300,8 @@ class SupabaseManager {
 
       let publicUrl = "";
       try {
-        const { data: signedData } = await this.client.storage.from(this.bucketName).createSignedUrl(storagePath, 3600);
+        // Lifetime view limit: 10 years (315,360,000 seconds)
+        const { data: signedData } = await this.client.storage.from(this.bucketName).createSignedUrl(storagePath, 315360000);
         publicUrl = signedData ? signedData.signedUrl : "";
       } catch (e) {
         console.warn("Signed URL error:", e);
@@ -322,27 +323,112 @@ class SupabaseManager {
 
       const { data: dbData, error: dbError } = await this.client
         .from(this.tableName)
-        .insert([rowData]);
+        .insert([rowData])
+        .select();
 
       if (dbError) {
         console.warn("Supabase DB Insert Notice:", dbError.message);
       }
 
-      return { storageData, publicUrl };
+      return { storageData, publicUrl, dbData };
     } catch (err) {
       console.error("Supabase PDF Upload Error:", err);
       return null;
     }
   }
 
-  // ADMIN API: FETCH ALL GENERATED PDFS
+  // GET FRESH LIFETIME VIEW URL FOR A PDF (10 YEARS EXPIRY)
+  async getPdfUrl(storagePath, fallbackUrl) {
+    if (!this.client || !storagePath) return fallbackUrl || "";
+    try {
+      // 10 years = 315,360,000 seconds
+      const { data, error } = await this.client.storage
+        .from(this.bucketName)
+        .createSignedUrl(storagePath, 315360000);
+      if (!error && data && data.signedUrl) {
+        return data.signedUrl;
+      }
+    } catch (e) {
+      console.warn("Supabase Signed URL error:", e);
+    }
+
+    try {
+      const { data: pubData } = this.client.storage.from(this.bucketName).getPublicUrl(storagePath);
+      if (pubData && pubData.publicUrl) return pubData.publicUrl;
+    } catch (e) {}
+
+    return fallbackUrl || "";
+  }
+
+  // UPDATE & REPLACE EXISTING PDF FILE IN STORAGE AND DATABASE
+  async replacePdfInSupabase(pdfBlob, existingRecord, updatedData = {}) {
+    if (!this.client || !existingRecord) return null;
+
+    try {
+      const storagePath = existingRecord.storage_path || existingRecord.filename;
+
+      // 1. Overwrite existing PDF file in Supabase Storage with upsert: true
+      const { data: storageData, error: storageError } = await this.client.storage
+        .from(this.bucketName)
+        .upload(storagePath, pdfBlob, {
+          contentType: "application/pdf",
+          upsert: true,
+        });
+
+      if (storageError) {
+        console.warn("Supabase Storage Replace Notice:", storageError.message);
+      }
+
+      // 2. Generate a fresh lifetime signed URL (10 years)
+      let publicUrl = existingRecord.public_url || "";
+      try {
+        const { data: signedData } = await this.client.storage
+          .from(this.bucketName)
+          .createSignedUrl(storagePath, 315360000);
+        if (signedData && signedData.signedUrl) {
+          publicUrl = signedData.signedUrl;
+        }
+      } catch (e) {
+        console.warn("Signed URL generation warning:", e);
+      }
+
+      // 3. Update existing row in farmer_cards table
+      const updateFields = {
+        english_name: updatedData.englishName || existingRecord.english_name || "Farmer",
+        marathi_name: updatedData.marathiName || existingRecord.marathi_name || "",
+        aadhaar: updatedData.aadhaar || existingRecord.aadhaar || "",
+        card_number: updatedData.cardNumber || existingRecord.card_number || "",
+        mobile: updatedData.mobile || existingRecord.mobile || "",
+        public_url: publicUrl,
+        storage_path: storagePath,
+      };
+
+      const { data: dbData, error: dbError } = await this.client
+        .from(this.tableName)
+        .update(updateFields)
+        .eq("id", existingRecord.id)
+        .select();
+
+      if (dbError) {
+        console.warn("Supabase DB Update Notice:", dbError.message);
+      }
+
+      return { success: true, storageData, publicUrl, dbData };
+    } catch (err) {
+      console.error("Supabase Replace PDF Error:", err);
+      return null;
+    }
+  }
+
+  // ADMIN API: FETCH ALL GENERATED PDFS (INCREASED LIMIT)
   async fetchPdfHistory() {
     if (!this.client) return [];
     try {
       const { data, error } = await this.client
         .from(this.tableName)
         .select("*")
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(10000);
 
       if (error) return [];
       return data || [];
@@ -359,7 +445,8 @@ class SupabaseManager {
         .from(this.tableName)
         .select("*")
         .or(`user_id.eq.${this.currentUser.id},user_email.eq.${this.currentUser.email}`)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(10000);
 
       if (error) return [];
       return data || [];
