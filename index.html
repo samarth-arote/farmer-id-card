@@ -15,6 +15,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600;700;800&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="edit-studio.css">
   <script src="assets/vendor/html2canvas.min.js"></script>
   <script src="assets/vendor/jspdf.umd.min.js"></script>
   <script src="assets/vendor/qrcode.min.js"></script>
@@ -270,6 +271,288 @@
           </table>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- DEDICATED FULLSCREEN EDIT STUDIO MODAL -->
+  <div class="edit-studio-overlay hidden" id="editStudioModal">
+    <div class="edit-studio-container">
+      <!-- Studio Header -->
+      <div class="studio-header">
+        <div class="studio-title-area">
+          <div class="studio-logo-icon">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+            </svg>
+          </div>
+          <div class="studio-title-info">
+            <h2>
+              <span>Farmer Card Edit Studio</span>
+              <span class="studio-mode-badge">Edit Mode</span>
+            </h2>
+            <div class="studio-meta-subtext" id="studioRecordSubtitle">
+              Modifying: Loading card details...
+            </div>
+          </div>
+        </div>
+
+        <div class="studio-header-actions">
+          <span class="diff-counter-pill" id="studioDiffCounter">No changes yet</span>
+          <button type="button" class="btn-studio-revert" id="btnStudioRevertAll" title="Reset all fields to original card data">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="1 4 1 10 7 10"></polyline>
+              <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+            </svg>
+            Revert to Original
+          </button>
+          <button type="button" class="btn-studio-close" id="btnStudioClose" title="Exit Edit Studio">
+            ✕
+          </button>
+        </div>
+      </div>
+
+      <!-- Studio Workspace: Split Screen Form & Live Preview -->
+      <div class="studio-workspace">
+        <!-- Left: Edit Form with Original Value Badges -->
+        <div class="studio-form-col">
+          <form id="studioEditForm" onsubmit="return false;">
+            
+            <!-- Section 1: Personal Details -->
+            <div class="studio-section-card">
+              <div class="studio-section-header">
+                <h4 class="studio-section-title">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                  </svg>
+                  Personal Details / वैयक्तिक माहिती
+                </h4>
+              </div>
+
+              <div class="studio-grid-2">
+                <div class="studio-field-group" data-field="marathiName">
+                  <div class="studio-label-row">
+                    <span>Marathi Name / मराठी नाव</span>
+                    <span class="orig-badge" id="origBadge_marathiName">Original: <strong>-</strong></span>
+                  </div>
+                  <input type="text" class="studio-input" name="marathiName" placeholder="उदा. मनोज">
+                </div>
+
+                <div class="studio-field-group" data-field="englishName">
+                  <div class="studio-label-row">
+                    <span>English Name</span>
+                    <span class="orig-badge" id="origBadge_englishName">Original: <strong>-</strong></span>
+                  </div>
+                  <input type="text" class="studio-input" name="englishName" placeholder="e.g. Manoj">
+                </div>
+              </div>
+
+              <div class="studio-grid-3" style="margin-top: 10px;">
+                <div class="studio-field-group" data-field="dobDate">
+                  <div class="studio-label-row">
+                    <span>DOB / जन्म तारीख</span>
+                    <span class="orig-badge" id="origBadge_dob">Original: <strong>-</strong></span>
+                  </div>
+                  <input type="date" class="studio-input" name="dobDate">
+                </div>
+
+                <div class="studio-field-group" data-field="gender">
+                  <div class="studio-label-row">
+                    <span>Gender / लिंग</span>
+                    <span class="orig-badge" id="origBadge_gender">Original: <strong>-</strong></span>
+                  </div>
+                  <select class="studio-input" name="gender">
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+
+                <div class="studio-field-group" data-field="mobile">
+                  <div class="studio-label-row">
+                    <span>Mobile No.</span>
+                    <span class="orig-badge" id="origBadge_mobile">Original: <strong>-</strong></span>
+                  </div>
+                  <input type="tel" class="studio-input" name="mobile" placeholder="10 digits" maxlength="10">
+                </div>
+              </div>
+            </div>
+
+            <!-- Section 2: Identification Numbers -->
+            <div class="studio-section-card">
+              <div class="studio-section-header">
+                <h4 class="studio-section-title">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="4" width="18" height="16" rx="2"></rect>
+                    <line x1="7" y1="8" x2="17" y2="8"></line>
+                    <line x1="7" y1="12" x2="17" y2="12"></line>
+                    <line x1="7" y1="16" x2="12" y2="16"></line>
+                  </svg>
+                  Identification Numbers / ओळख क्रमांक
+                </h4>
+              </div>
+
+              <div class="studio-grid-2">
+                <div class="studio-field-group" data-field="aadhaar">
+                  <div class="studio-label-row">
+                    <span>Aadhaar No / आधार नं</span>
+                    <span class="orig-badge" id="origBadge_aadhaar">Original: <strong>-</strong></span>
+                  </div>
+                  <input type="text" class="studio-input" name="aadhaar" placeholder="XXXX XXXX XXXX" maxlength="14">
+                </div>
+
+                <div class="studio-field-group" data-field="cardNumber">
+                  <div class="studio-label-row">
+                    <span>Card Number / कार्ड क्र.</span>
+                    <span class="orig-badge" id="origBadge_cardNumber">Original: <strong>-</strong></span>
+                  </div>
+                  <input type="text" class="studio-input" name="cardNumber" placeholder="XXXX XXXX XXX" maxlength="13">
+                </div>
+              </div>
+            </div>
+
+            <!-- Section 3: Farmer Photo -->
+            <div class="studio-section-card">
+              <div class="studio-section-header">
+                <h4 class="studio-section-title">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                    <polyline points="21 15 16 10 5 21"></polyline>
+                  </svg>
+                  Farmer Photograph / छायाचित्र
+                </h4>
+                <span class="orig-badge" id="origBadge_photo">Original Photo: <strong>Loaded</strong></span>
+              </div>
+
+              <div class="studio-photo-editor">
+                <div class="studio-photo-thumb" id="studioPhotoThumb">
+                  <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <circle cx="12" cy="8" r="4"></circle>
+                    <path d="M4 20c0-4 4-6 8-6s8 2 8 6"></path>
+                  </svg>
+                </div>
+                <div class="studio-photo-details">
+                  <strong style="font-size: 13px; color: #16241c;">Update or Keep Existing Photo</strong>
+                  <span style="font-size: 11.5px; color: #557564;" id="studioPhotoStatus">Old photo restored from card</span>
+                  <div class="studio-photo-actions">
+                    <label class="btn-upload-photo">
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                      </svg>
+                      Browse New Photo
+                      <input type="file" id="studioPhotoInput" accept="image/*" style="display:none;">
+                    </label>
+                    <button type="button" class="btn-revert-photo hidden" id="btnStudioRevertPhoto">
+                      Revert to Original Photo
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Section 4: Address & Location -->
+            <div class="studio-section-card">
+              <div class="studio-section-header">
+                <h4 class="studio-section-title">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                    <circle cx="12" cy="10" r="3"></circle>
+                  </svg>
+                  Residential Address / संपूर्ण पत्ता
+                </h4>
+                <span class="orig-badge" id="origBadge_address">Original: <strong>-</strong></span>
+              </div>
+
+              <div class="studio-field-group" data-field="address">
+                <textarea class="studio-input" name="address" rows="2" placeholder="गाव, तालुका, जिल्हा"></textarea>
+              </div>
+            </div>
+
+            <!-- Section 5: Land Details -->
+            <div class="studio-section-card">
+              <div class="studio-section-header">
+                <h4 class="studio-section-title">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                    <polyline points="2 17 12 22 22 17"></polyline>
+                    <polyline points="2 12 12 17 22 12"></polyline>
+                  </svg>
+                  Land Records / जमिनीची माहिती (7/12)
+                </h4>
+                <span class="orig-badge" id="origBadge_lands">Original: <strong>Loaded</strong></span>
+              </div>
+
+              <div id="studioLandRows">
+                <!-- Land rows dynamically populated -->
+              </div>
+
+              <button type="button" class="btn-add-studio-land" id="btnAddStudioLand">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                Add Another Land Row / नवीन जमीन जोडा
+              </button>
+            </div>
+
+          </form>
+        </div>
+
+        <!-- Right: Real-time Live Preview -->
+        <div class="studio-preview-col">
+          <div class="studio-preview-header">
+            <h3>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+              Live Card Preview
+            </h3>
+            <div class="studio-preview-tabs">
+              <button type="button" class="preview-tab-btn active" data-studio-view="both">Both Sides</button>
+              <button type="button" class="preview-tab-btn" data-studio-view="front">Front Only</button>
+              <button type="button" class="preview-tab-btn" data-studio-view="back">Back Only</button>
+            </div>
+          </div>
+
+          <div class="studio-card-display-area" id="studioCardDisplayArea">
+            <!-- Front Card Stage -->
+            <div class="studio-card-wrapper" id="studioFrontWrapper">
+              <div id="studioFrontStage"></div>
+            </div>
+            <!-- Back Card Stage -->
+            <div class="studio-card-wrapper" id="studioBackWrapper">
+              <div id="studioBackStage"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Studio Footer / Action Bar -->
+      <div class="studio-footer">
+        <div class="studio-status-note">
+          <span class="studio-status-dot"></span>
+          <span id="studioFooterStatus">Loaded original farmer card data. Modify fields and click Replace to apply.</span>
+        </div>
+        <div class="studio-footer-buttons">
+          <button type="button" class="btn-studio-cancel" id="btnStudioCancel">
+            Cancel
+          </button>
+          <button type="button" class="btn-studio-save" id="btnStudioSave">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+              <polyline points="17 21 17 13 7 13 7 21"></polyline>
+              <polyline points="7 3 7 8 15 8"></polyline>
+            </svg>
+            Update & Replace PDF
+          </button>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -645,5 +928,6 @@
   <script src="supabase.js"></script>
   <script src="admin.js"></script>
   <script src="script.js"></script>
+  <script src="edit-manager.js"></script>
 </body>
 </html>

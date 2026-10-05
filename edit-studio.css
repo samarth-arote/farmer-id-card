@@ -1,0 +1,639 @@
+/* ==========================================================================
+   FARMER CARD EDIT STUDIO - DEDICATED FULLSCREEN EDITING INTERFACE
+   Separate stylesheet for the dedicated card editing suite
+   ========================================================================== */
+
+.edit-studio-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 24, 16, 0.88);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  z-index: 10002;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: studioFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes studioFadeIn {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.edit-studio-container {
+  background: #ffffff;
+  border-radius: 20px;
+  width: 98vw;
+  max-width: 1440px;
+  height: 94vh;
+  max-height: 900px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* ==========================================================================
+   STUDIO HEADER
+   ========================================================================== */
+
+.studio-header {
+  padding: 14px 24px;
+  background: linear-gradient(135deg, #1b543e 0%, #0f3929 100%);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  border-bottom: 2px solid rgba(255, 211, 36, 0.3);
+}
+
+.studio-title-area {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.studio-logo-icon {
+  width: 38px;
+  height: 38px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffd324;
+}
+
+.studio-title-info h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.studio-mode-badge {
+  background: #ffd324;
+  color: #123d2d;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.studio-meta-subtext {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.75);
+  margin-top: 2px;
+}
+
+.studio-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.diff-counter-pill {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: all 0.2s ease;
+}
+
+.diff-counter-pill.has-changes {
+  background: #ffd324;
+  color: #123d2d;
+  border-color: #ffd324;
+  box-shadow: 0 0 12px rgba(255, 211, 36, 0.4);
+}
+
+.btn-studio-revert {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  padding: 7px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.btn-studio-revert:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.btn-studio-close {
+  background: rgba(255, 255, 255, 0.15);
+  border: none;
+  color: #ffffff;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-studio-close:hover {
+  background: #e53e3e;
+  color: #ffffff;
+}
+
+/* ==========================================================================
+   STUDIO BODY (SPLIT-SCREEN WORKSPACE)
+   ========================================================================== */
+
+.studio-workspace {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  flex: 1;
+  overflow: hidden;
+  background: #f4f7f5;
+}
+
+/* LEFT COLUMN: EDIT FORM */
+.studio-form-col {
+  padding: 20px 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  border-right: 1px solid #dbe6e0;
+}
+
+.studio-form-col::-webkit-scrollbar {
+  width: 6px;
+}
+
+.studio-form-col::-webkit-scrollbar-thumb {
+  background: #b5cdc0;
+  border-radius: 10px;
+}
+
+/* EDIT SECTION CARDS */
+.studio-section-card {
+  background: #ffffff;
+  border-radius: 14px;
+  border: 1px solid #dce8e1;
+  padding: 16px 18px;
+  box-shadow: 0 2px 8px rgba(18, 61, 45, 0.04);
+}
+
+.studio-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #edf4f0;
+}
+
+.studio-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #1b543e;
+  margin: 0;
+}
+
+.studio-section-title svg {
+  color: #236b4f;
+}
+
+/* FIELD WRAPPERS & ORIGINAL COMPARISON BADGES */
+.studio-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+  position: relative;
+}
+
+.studio-field-group:last-child {
+  margin-bottom: 0;
+}
+
+.studio-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 600;
+  color: #2e493b;
+}
+
+.orig-badge {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #edf3f0;
+  color: #557564;
+  border: 1px solid #d3e2da;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 260px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.orig-badge strong {
+  color: #236b4f;
+  font-weight: 700;
+}
+
+.studio-input {
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1.5px solid #c8dcd1;
+  background: #fbfdfc;
+  color: #16241c;
+  font-size: 13.5px;
+  font-weight: 500;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.studio-input:focus {
+  border-color: #236b4f;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(35, 107, 79, 0.12);
+}
+
+/* Highlighting modified fields */
+.studio-input.field-modified {
+  border-color: #e59c00;
+  background: #fffdf5;
+  box-shadow: 0 0 0 3px rgba(229, 156, 0, 0.12);
+}
+
+.studio-field-group.is-modified .orig-badge {
+  background: #fff8e6;
+  border-color: #ffd324;
+  color: #8c6200;
+}
+
+.studio-field-group.is-modified .orig-badge strong {
+  color: #b37400;
+}
+
+.studio-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.studio-grid-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+}
+
+/* PHOTO EDITING COMPONENT */
+.studio-photo-editor {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  background: #f7faf8;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1.5px dashed #c0d8cb;
+}
+
+.studio-photo-thumb {
+  width: 76px;
+  height: 94px;
+  border-radius: 8px;
+  background: #e3ede7;
+  border: 2px solid #ffffff;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.studio-photo-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.studio-photo-thumb svg {
+  color: #809c8d;
+}
+
+.studio-photo-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.studio-photo-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn-upload-photo {
+  background: #236b4f;
+  color: #ffffff;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+
+.btn-upload-photo:hover {
+  background: #1b543e;
+}
+
+.btn-revert-photo {
+  background: #ffffff;
+  color: #4b6656;
+  border: 1px solid #c0d8cb;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-revert-photo:hover {
+  background: #edf4f0;
+}
+
+/* LAND ROWS IN EDIT STUDIO */
+.studio-land-card {
+  background: #f9fbf9;
+  border: 1px solid #d6e5dd;
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  position: relative;
+}
+
+.studio-land-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #3b5f4c;
+}
+
+.btn-del-land-row {
+  background: #fee2e2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-del-land-row:hover {
+  background: #dc2626;
+  color: #ffffff;
+}
+
+.btn-add-studio-land {
+  width: 100%;
+  padding: 8px;
+  background: #eaf4ee;
+  color: #1b543e;
+  border: 1.5px dashed #236b4f;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 12.5px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+
+.btn-add-studio-land:hover {
+  background: #d6ecdf;
+}
+
+/* ==========================================================================
+   RIGHT COLUMN: LIVE PREVIEW STAGE
+   ========================================================================== */
+
+.studio-preview-col {
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  background: #eef4f0;
+  overflow-y: auto;
+}
+
+.studio-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  flex-shrink: 0;
+}
+
+.studio-preview-header h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #163628;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.studio-preview-tabs {
+  display: flex;
+  background: #dce7e1;
+  padding: 3px;
+  border-radius: 8px;
+  gap: 3px;
+}
+
+.preview-tab-btn {
+  background: transparent;
+  border: none;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #3b5f4c;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.preview-tab-btn.active {
+  background: #ffffff;
+  color: #123d2d;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+.studio-card-display-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  min-height: 480px;
+  padding: 10px 0;
+}
+
+.studio-card-wrapper {
+  width: 100%;
+  max-width: 504px;
+  height: 325px;
+  position: relative;
+  overflow: hidden;
+  border-radius: 14px;
+  box-shadow: 0 14px 32px rgba(18, 61, 45, 0.16);
+  background: #ffffff;
+  transition: all 0.25s ease;
+}
+
+.studio-card-wrapper .scaled-card {
+  width: 1008px;
+  height: 650px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform: scale(0.5);
+  transform-origin: top left;
+}
+
+/* ==========================================================================
+   STUDIO FOOTER / ACTION BAR
+   ========================================================================== */
+
+.studio-footer {
+  padding: 14px 24px;
+  background: #ffffff;
+  border-top: 1px solid #dce8e1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.studio-status-note {
+  font-size: 12px;
+  color: #557564;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.studio-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+}
+
+.studio-footer-buttons {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-studio-cancel {
+  background: #f1f5f3;
+  color: #435b4e;
+  border: 1px solid #cbdcd2;
+  padding: 9px 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-studio-cancel:hover {
+  background: #e2ece6;
+}
+
+.btn-studio-save {
+  background: linear-gradient(135deg, #236b4f 0%, #154c37 100%);
+  color: #ffffff;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 14px rgba(35, 107, 79, 0.35);
+  transition: all 0.2s;
+}
+
+.btn-studio-save:hover {
+  background: linear-gradient(135deg, #1b543e 0%, #0d3626 100%);
+  box-shadow: 0 6px 18px rgba(35, 107, 79, 0.45);
+  transform: translateY(-1px);
+}
+
+.btn-studio-save:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* RESPONSIVE DESIGN */
+@media (max-width: 1024px) {
+  .studio-workspace {
+    grid-template-columns: 1fr;
+    overflow-y: auto;
+  }
+  .studio-form-col {
+    border-right: none;
+    border-bottom: 1px solid #dbe6e0;
+    overflow-y: visible;
+  }
+  .studio-preview-col {
+    overflow-y: visible;
+  }
+}
