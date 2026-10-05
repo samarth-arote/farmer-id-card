@@ -773,40 +773,56 @@ async function proceedWithReplacePdf() {
     "FAST"
   );
 
-  const filename = currentEditingRecord.filename || `${(data.englishName || "farmer").trim().toLowerCase().replace(/[^a-z0-9]+/gi, "-")}_updated.pdf`;
+  const rawName = (data.englishName || "Farmer")
+      .trim()
+      .replace(/[^a-z0-9]+/gi, "-")
+      .replace(/^-|-$/g, "")
+      .toLowerCase();
 
-  pdf.save(filename);
+  const timestamp = getFormattedTimestamp();
+  const newFilename = `${rawName || "farmer"}_${timestamp}.pdf`;
+
+  pdf.save(newFilename);
 
   const pdfBlob = pdf.output("blob");
 
-  // Cache full updated form state in localStorage
-  try {
-    const fullMeta = { ...data, photoDataUrl: photoDataUrl || "" };
-    if (currentEditingRecord.id) {
-      localStorage.setItem(`farmer_card_meta_${currentEditingRecord.id}`, JSON.stringify(fullMeta));
-    }
-    if (currentEditingRecord.storage_path) {
-      localStorage.setItem(`farmer_card_meta_${currentEditingRecord.storage_path}`, JSON.stringify(fullMeta));
-    }
-    localStorage.setItem(`farmer_card_meta_${filename}`, JSON.stringify(fullMeta));
-  } catch (e) {}
-
   if (window.supabaseManager) {
-    const res = await window.supabaseManager.replacePdfInSupabase(pdfBlob, currentEditingRecord, data);
+    const res = await window.supabaseManager.replacePdfInSupabase(pdfBlob, currentEditingRecord, data, newFilename);
     if (res && res.success) {
-      alert("✅ PDF successfully updated & replaced! The old PDF has been permanently overwritten.");
-      if (window.adminConsole && window.adminConsole.cachedPdfList) {
-        const idx = window.adminConsole.cachedPdfList.findIndex(x => x.id === currentEditingRecord.id);
-        if (idx !== -1) {
-          window.adminConsole.cachedPdfList[idx] = {
-            ...window.adminConsole.cachedPdfList[idx],
-            english_name: data.englishName || window.adminConsole.cachedPdfList[idx].english_name,
-            marathi_name: data.marathiName || window.adminConsole.cachedPdfList[idx].marathi_name,
-            aadhaar: data.aadhaar || window.adminConsole.cachedPdfList[idx].aadhaar,
-            card_number: data.cardNumber || window.adminConsole.cachedPdfList[idx].card_number,
-            mobile: data.mobile || window.adminConsole.cachedPdfList[idx].mobile,
-            public_url: res.publicUrl || window.adminConsole.cachedPdfList[idx].public_url,
-          };
+      alert("✅ PDF successfully updated & replaced! The old PDF in storage has been permanently overwritten.");
+
+      // Cache full updated form state in localStorage
+      try {
+        const fullMeta = { ...data, photoDataUrl: photoDataUrl || "" };
+        if (res.record && res.record.id) {
+          localStorage.setItem(`farmer_card_meta_${res.record.id}`, JSON.stringify(fullMeta));
+        }
+        localStorage.setItem(`farmer_card_meta_${currentEditingRecord.id}`, JSON.stringify(fullMeta));
+        localStorage.setItem(`farmer_card_meta_${newFilename}`, JSON.stringify(fullMeta));
+      } catch (e) {}
+
+      // Update admin console table immediately if loaded
+      if (window.adminConsole) {
+        const updatedRecord = res.record || {
+          ...currentEditingRecord,
+          english_name: data.englishName || currentEditingRecord.english_name,
+          marathi_name: data.marathiName || currentEditingRecord.marathi_name,
+          aadhaar: data.aadhaar || currentEditingRecord.aadhaar,
+          card_number: data.cardNumber || currentEditingRecord.card_number,
+          mobile: data.mobile || currentEditingRecord.mobile,
+          public_url: res.publicUrl || currentEditingRecord.public_url,
+          storage_path: res.storagePath || newFilename,
+          filename: newFilename,
+        };
+
+        if (window.adminConsole.cachedPdfList) {
+          const idx = window.adminConsole.cachedPdfList.findIndex(
+            (x) => x.id === currentEditingRecord.id || x.storage_path === currentEditingRecord.storage_path
+          );
+          if (idx !== -1) {
+            window.adminConsole.cachedPdfList[idx] = updatedRecord;
+          }
+          window.adminConsole.renderPdfsTable(window.adminConsole.cachedPdfList);
         }
       }
     } else {

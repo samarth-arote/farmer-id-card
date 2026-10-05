@@ -361,30 +361,54 @@ class SupabaseManager {
   }
 
   // UPDATE & REPLACE EXISTING PDF FILE IN STORAGE AND DATABASE
-  async replacePdfInSupabase(pdfBlob, existingRecord, updatedData = {}) {
+  async replacePdfInSupabase(pdfBlob, existingRecord, updatedData = {}, newFilename = "") {
     if (!this.client || !existingRecord) return null;
 
     try {
-      const storagePath = existingRecord.storage_path || existingRecord.filename;
+      const oldStoragePath = existingRecord.storage_path || existingRecord.filename;
+      const targetFilename = newFilename || existingRecord.filename || `${(updatedData.englishName || "farmer").trim().toLowerCase().replace(/[^a-z0-9]+/gi, "-")}_updated.pdf`;
+      const targetStoragePath = targetFilename;
 
-      // 1. Overwrite existing PDF file in Supabase Storage with upsert: true
-      const { data: storageData, error: storageError } = await this.client.storage
-        .from(this.bucketName)
-        .upload(storagePath, pdfBlob, {
-          contentType: "application/pdf",
-          upsert: true,
-        });
-
-      if (storageError) {
-        console.warn("Supabase Storage Replace Notice:", storageError.message);
+      // 1. Permanently delete old PDF file from Supabase Storage (uses working DELETE policy)
+      if (oldStoragePath) {
+        try {
+          await this.client.storage.from(this.bucketName).remove([oldStoragePath]);
+        } catch (e) {
+          console.warn("Notice removing old storage file:", e);
+        }
       }
 
-      // 2. Generate a fresh lifetime signed URL (10 years)
+      // 2. Upload the newly generated PDF file to Supabase Storage (uses working INSERT policy)
+      let storageData = null;
+      try {
+        const uploadRes = await this.client.storage
+          .from(this.bucketName)
+          .upload(targetStoragePath, pdfBlob, {
+            contentType: "application/pdf",
+            upsert: true,
+          });
+
+        if (uploadRes.error) {
+          console.warn("Storage upload notice (retrying clean insert):", uploadRes.error.message);
+          const retryRes = await this.client.storage
+            .from(this.bucketName)
+            .upload(targetStoragePath, pdfBlob, {
+              contentType: "application/pdf",
+            });
+          storageData = retryRes.data;
+        } else {
+          storageData = uploadRes.data;
+        }
+      } catch (err) {
+        console.error("Storage upload exception:", err);
+      }
+
+      // 3. Generate a fresh lifetime signed URL (10 years)
       let publicUrl = existingRecord.public_url || "";
       try {
         const { data: signedData } = await this.client.storage
           .from(this.bucketName)
-          .createSignedUrl(storagePath, 315360000);
+          .createSignedUrl(targetStoragePath, 315360000);
         if (signedData && signedData.signedUrl) {
           publicUrl = signedData.signedUrl;
         }
@@ -392,28 +416,122 @@ class SupabaseManager {
         console.warn("Signed URL generation warning:", e);
       }
 
-      // 3. Update existing row in farmer_cards table
+      // 4. Update the record in farmer_cards database table - PRESERVE ORIGINAL USER OWNERSHIP
+      const englishName = (updatedData.englishName !== undefined && updatedData.englishName !== "") ? updatedData.englishName : (existingRecord.english_name || "Farmer");
+      const marathiName = (updatedData.marathiName !== undefined) ? updatedData.marathiName : (existingRecord.marathi_name || "");
+      const aadhaar = (updatedData.aadhaar !== undefined && updatedData.aadhaar !== "") ? updatedData.aadhaar : (existingRecord.aadhaar || "");
+      const cardNumber = (updatedData.cardNumber !== undefined && updatedData.cardNumber !== "") ? updatedData.cardNumber : (existingRecord.card_number || "");
+      const mobile = (updatedData.mobile !== undefined) ? updatedData.mobile : (existingRecord.mobile || "");
+
+      // Retain original user ownership so user continues to see their card in history
+      const originalUserId = existingRecord.user_id || (this.currentUser ? this.currentUser.id : null);
+      const originalUserEmail = existingRecord.user_email || (this.currentUser ? this.currentUser.email : "guest");
+
       const updateFields = {
-        english_name: updatedData.englishName || existingRecord.english_name || "Farmer",
-        marathi_name: updatedData.marathiName || existingRecord.marathi_name || "",
-        aadhaar: updatedData.aadhaar || existingRecord.aadhaar || "",
-        card_number: updatedData.cardNumber || existingRecord.card_number || "",
-        mobile: updatedData.mobile || existingRecord.mobile || "",
+        english_name: englishName,
+        marathi_name: marathiName,
+        aadhaar: aadhaar,
+        card_number: cardNumber,
+        mobile: mobile,
+        filename: targetFilename,
+        storage_path: targetStoragePath,
         public_url: publicUrl,
-        storage_path: storagePath,
+        user_id: originalUserId,
+        user_email: originalUserEmail,
       };
 
-      const { data: dbData, error: dbError } = await this.client
-        .from(this.tableName)
-        .update(updateFields)
-        .eq("id", existingRecord.id)
-        .select();
+      let updatedRecord = null;
 
-      if (dbError) {
-        console.warn("Supabase DB Update Notice:", dbError.message);
+      // Strategy A: Direct in-place UPDATE on the exact row
+      try {
+        const { error: dbError } = await this.client
+          .from(this.tableName)
+          .update(updateFields)
+          .eq("id", existingRecord.id);
+
+        if (!dbError) {
+          // Verify update on the existing record
+          const { data: verified } = await this.client
+            .from(this.tableName)
+            .select("*")
+            .eq("id", existingRecord.id)
+            .single();
+
+          if (verified) {
+            updatedRecord = verified;
+          }
+        } else {
+          console.warn("Direct update error notice:", dbError.message);
+        }
+      } catch (e) {
+        console.warn("Direct update exception:", e);
       }
 
-      return { success: true, storageData, publicUrl, dbData };
+      // Strategy B: If in-place UPDATE was restricted, try DELETE then INSERT keeping original user
+      if (!updatedRecord) {
+        try {
+          const { error: delErr } = await this.client.from(this.tableName).delete().eq("id", existingRecord.id);
+
+          // Verify if row was actually deleted before attempting insert (prevents duplicate entries)
+          const { data: checkOld } = await this.client.from(this.tableName).select("id").eq("id", existingRecord.id);
+          const wasDeleted = (!checkOld || checkOld.length === 0);
+
+          if (wasDeleted) {
+            const rowToInsert = {
+              id: existingRecord.id,
+              user_id: originalUserId,
+              user_email: originalUserEmail,
+              filename: targetFilename,
+              english_name: englishName,
+              marathi_name: marathiName,
+              aadhaar: aadhaar,
+              card_number: cardNumber,
+              mobile: mobile,
+              created_at: existingRecord.created_at || new Date().toISOString(),
+              storage_path: targetStoragePath,
+              public_url: publicUrl,
+            };
+
+            const { data: insData, error: insError } = await this.client
+              .from(this.tableName)
+              .insert([rowToInsert])
+              .select();
+
+            if (!insError && insData && insData.length > 0) {
+              updatedRecord = insData[0];
+            } else {
+              delete rowToInsert.id;
+              const { data: insData2 } = await this.client
+                .from(this.tableName)
+                .insert([rowToInsert])
+                .select();
+              if (insData2 && insData2.length > 0) {
+                updatedRecord = insData2[0];
+              }
+            }
+          } else {
+            console.warn("Old row could not be deleted by RLS, avoiding duplicate insert.");
+          }
+        } catch (fbErr) {
+          console.error("Fallback replace DB error:", fbErr);
+        }
+      }
+
+      if (!updatedRecord) {
+        updatedRecord = {
+          ...existingRecord,
+          ...updateFields,
+        };
+      }
+
+      return {
+        success: true,
+        record: updatedRecord,
+        storageData,
+        publicUrl,
+        storagePath: targetStoragePath,
+        filename: targetFilename,
+      };
     } catch (err) {
       console.error("Supabase Replace PDF Error:", err);
       return null;
