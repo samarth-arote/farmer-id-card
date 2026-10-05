@@ -408,29 +408,55 @@ class SupabaseManager {
   // GET CARD METADATA (JSON) FROM STORAGE
   async getCardMetadata(storagePath) {
     if (!this.client || !storagePath) return null;
-    try {
-      const { data, error } = await this.client.storage
-        .from(this.bucketName)
-        .download(`${storagePath}.meta.json`);
-      if (!error && data) {
-        const text = await data.text();
-        return JSON.parse(text);
-      }
-    } catch (e) {}
+    const cleanPath = storagePath.split("?")[0].replace(/^https?:\/\/[^\/]+\/storage\/v1\/object\/public\/[^\/]+\//i, "");
+    const baseName = cleanPath.split("/").pop();
+    const candidatePaths = [
+      `${cleanPath}.meta.json`,
+      cleanPath.endsWith(".pdf") ? `${cleanPath.slice(0, -4)}.meta.json` : null,
+      `${baseName}.meta.json`,
+      baseName.endsWith(".pdf") ? `${baseName.slice(0, -4)}.meta.json` : null,
+      cleanPath.endsWith(".meta.json") ? cleanPath : null
+    ].filter(Boolean);
+
+    for (const path of candidatePaths) {
+      try {
+        const { data, error } = await this.client.storage
+          .from(this.bucketName)
+          .download(path);
+        if (!error && data) {
+          const text = await data.text();
+          const parsed = JSON.parse(text);
+          if (parsed && typeof parsed === "object") {
+            return parsed;
+          }
+        }
+      } catch (e) {}
+    }
     return null;
   }
 
   // GET CARD COMPANION PHOTO BLOB FROM STORAGE
   async getCardPhotoBlob(storagePath) {
     if (!this.client || !storagePath) return null;
-    try {
-      const { data, error } = await this.client.storage
-        .from(this.bucketName)
-        .download(`${storagePath}.photo.jpg`);
-      if (!error && data) {
-        return data;
-      }
-    } catch (e) {}
+    const cleanPath = storagePath.split("?")[0].replace(/^https?:\/\/[^\/]+\/storage\/v1\/object\/public\/[^\/]+\//i, "");
+    const baseName = cleanPath.split("/").pop();
+    const candidatePaths = [
+      `${cleanPath}.photo.jpg`,
+      cleanPath.endsWith(".pdf") ? `${cleanPath.slice(0, -4)}.photo.jpg` : null,
+      `${baseName}.photo.jpg`,
+      baseName.endsWith(".pdf") ? `${baseName.slice(0, -4)}.photo.jpg` : null
+    ].filter(Boolean);
+
+    for (const path of candidatePaths) {
+      try {
+        const { data, error } = await this.client.storage
+          .from(this.bucketName)
+          .download(path);
+        if (!error && data) {
+          return data;
+        }
+      } catch (e) {}
+    }
     return null;
   }
 

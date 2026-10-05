@@ -1,38 +1,41 @@
 /* ==========================================================================
-   FARMER CARD EDIT STUDIO - DEDICATED FULLSCREEN EDITING INTERFACE
-   Separate stylesheet for the dedicated card editing suite
+   FARMER CARD EDIT STUDIO - RESPONSIVE STYLESHEET (edit-studio.css)
+   Mobile & Tablet Free Adjustment + Desktop Split View
    ========================================================================== */
 
 .edit-studio-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(8, 24, 16, 0.88);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  background: rgba(8, 24, 16, 0.90);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   z-index: 10002;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 16px;
-  animation: studioFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  padding: 14px;
+  box-sizing: border-box;
+  overflow: hidden;
+  animation: studioFadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes studioFadeIn {
-  from { opacity: 0; transform: scale(0.98); }
+  from { opacity: 0; transform: scale(0.985); }
   to { opacity: 1; transform: scale(1); }
 }
 
 .edit-studio-container {
   background: #ffffff;
-  border-radius: 20px;
-  width: 98vw;
-  max-width: 1440px;
+  border-radius: 18px;
+  width: 100%;
+  max-width: 1400px;
   height: 94vh;
-  max-height: 900px;
+  max-height: 920px;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 25px 70px rgba(0, 0, 0, 0.45);
   overflow: hidden;
+  box-sizing: border-box;
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
@@ -41,7 +44,7 @@
    ========================================================================== */
 
 .studio-header {
-  padding: 14px 24px;
+  padding: 12px 20px;
   background: linear-gradient(135deg, #1b543e 0%, #0f3929 100%);
   color: #ffffff;
   display: flex;
@@ -49,66 +52,82 @@
   justify-content: space-between;
   flex-shrink: 0;
   border-bottom: 2px solid rgba(255, 211, 36, 0.3);
+  box-sizing: border-box;
+  gap: 12px;
 }
 
 .studio-title-area {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
+  min-width: 0;
 }
 
 .studio-logo-icon {
-  width: 38px;
-  height: 38px;
+  width: 36px;
+  height: 36px;
   background: rgba(255, 255, 255, 0.15);
   border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #ffd324;
+  flex-shrink: 0;
+}
+
+.studio-title-info {
+  min-width: 0;
 }
 
 .studio-title-info h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 700;
   letter-spacing: -0.2px;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  white-space: nowrap;
 }
 
 .studio-mode-badge {
   background: #ffd324;
   color: #123d2d;
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 800;
-  padding: 2px 8px;
-  border-radius: 6px;
+  padding: 2px 7px;
+  border-radius: 5px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  flex-shrink: 0;
 }
 
 .studio-meta-subtext {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.75);
-  margin-top: 2px;
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.78);
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 500px;
 }
 
 .studio-header-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  flex-shrink: 0;
 }
 
 .diff-counter-pill {
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
-  padding: 4px 12px;
+  padding: 4px 10px;
   border-radius: 20px;
   background: rgba(255, 255, 255, 0.12);
   color: #ffffff;
   border: 1px solid rgba(255, 255, 255, 0.2);
+  white-space: nowrap;
   transition: all 0.2s ease;
 }
 
@@ -116,21 +135,22 @@
   background: #ffd324;
   color: #123d2d;
   border-color: #ffd324;
-  box-shadow: 0 0 12px rgba(255, 211, 36, 0.4);
+  box-shadow: 0 0 10px rgba(255, 211, 36, 0.45);
 }
 
 .btn-studio-revert {
   background: rgba(255, 255, 255, 0.12);
   color: #ffffff;
   border: 1px solid rgba(255, 255, 255, 0.25);
-  padding: 7px 14px;
+  padding: 6px 12px;
   border-radius: 8px;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
+  white-space: nowrap;
   transition: all 0.2s ease;
 }
 
@@ -142,15 +162,16 @@
   background: rgba(255, 255, 255, 0.15);
   border: none;
   color: #ffffff;
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   border-radius: 8px;
-  font-size: 16px;
+  font-size: 15px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: all 0.2s;
+  flex-shrink: 0;
 }
 
 .btn-studio-close:hover {
@@ -159,25 +180,66 @@
 }
 
 /* ==========================================================================
-   STUDIO BODY (SPLIT-SCREEN WORKSPACE)
+   MOBILE & TABLET VIEW SWITCHER (Visible on Mobile / Tablet)
+   ========================================================================== */
+
+.studio-mobile-nav {
+  display: none;
+  background: #e4eee8;
+  padding: 6px 12px;
+  gap: 8px;
+  border-bottom: 1px solid #cde0d5;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.btn-mobile-nav {
+  flex: 1;
+  padding: 9px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #3b5f4c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-mobile-nav.active {
+  background: #ffffff;
+  color: #123d2d;
+  box-shadow: 0 2px 6px rgba(18, 61, 45, 0.12);
+}
+
+/* ==========================================================================
+   STUDIO WORKSPACE (DESKTOP SPLIT VIEW)
    ========================================================================== */
 
 .studio-workspace {
   display: grid;
-  grid-template-columns: 1.15fr 0.85fr;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
   flex: 1;
   overflow: hidden;
   background: #f4f7f5;
+  box-sizing: border-box;
 }
 
 /* LEFT COLUMN: EDIT FORM */
 .studio-form-col {
-  padding: 20px 24px;
+  padding: 18px 22px;
   overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   gap: 16px;
   border-right: 1px solid #dbe6e0;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .studio-form-col::-webkit-scrollbar {
@@ -189,49 +251,57 @@
   border-radius: 10px;
 }
 
-/* EDIT SECTION CARDS */
+#studioEditForm {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* SECTION CARDS */
 .studio-section-card {
   background: #ffffff;
-  border-radius: 14px;
+  border-radius: 12px;
   border: 1px solid #dce8e1;
-  padding: 16px 18px;
-  box-shadow: 0 2px 8px rgba(18, 61, 45, 0.04);
+  padding: 14px 16px;
+  box-shadow: 0 2px 6px rgba(18, 61, 45, 0.04);
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
 }
 
 .studio-section-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
   padding-bottom: 8px;
   border-bottom: 1px solid #edf4f0;
+  box-sizing: border-box;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .studio-section-title {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 700;
   color: #1b543e;
   margin: 0;
 }
 
-.studio-section-title svg {
-  color: #236b4f;
-}
-
-/* FIELD WRAPPERS & ORIGINAL COMPARISON BADGES */
+/* FIELD GROUPS & LABELS */
 .studio-field-group {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  margin-bottom: 12px;
-  position: relative;
-}
-
-.studio-field-group:last-child {
-  margin-bottom: 0;
+  min-width: 0;
+  box-sizing: border-box;
+  width: 100%;
 }
 
 .studio-label-row {
@@ -241,10 +311,13 @@
   font-size: 12px;
   font-weight: 600;
   color: #2e493b;
+  gap: 6px;
+  flex-wrap: wrap;
+  box-sizing: border-box;
 }
 
 .orig-badge {
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 500;
   padding: 2px 6px;
   border-radius: 4px;
@@ -254,10 +327,11 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  max-width: 260px;
+  max-width: 100%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  box-sizing: border-box;
 }
 
 .orig-badge strong {
@@ -267,14 +341,17 @@
 
 .studio-input {
   width: 100%;
-  padding: 9px 12px;
-  border-radius: 8px;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 8px 11px;
+  border-radius: 7px;
   border: 1.5px solid #c8dcd1;
   background: #fbfdfc;
   color: #16241c;
   font-size: 13.5px;
   font-weight: 500;
   outline: none;
+  min-width: 0;
   transition: all 0.2s ease;
 }
 
@@ -284,7 +361,6 @@
   box-shadow: 0 0 0 3px rgba(35, 107, 79, 0.12);
 }
 
-/* Highlighting modified fields */
 .studio-input.field-modified {
   border-color: #e59c00;
   background: #fffdf5;
@@ -301,42 +377,48 @@
   color: #b37400;
 }
 
+/* FLUID GRIDS (PREVENTS OVERFLOW) */
 .studio-grid-2 {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+  box-sizing: border-box;
+  width: 100%;
 }
 
 .studio-grid-3 {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
+  box-sizing: border-box;
+  width: 100%;
 }
 
 /* PHOTO EDITING COMPONENT */
 .studio-photo-editor {
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 14px;
   background: #f7faf8;
-  padding: 12px 14px;
-  border-radius: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
   border: 1.5px dashed #c0d8cb;
+  box-sizing: border-box;
+  width: 100%;
 }
 
 .studio-photo-thumb {
-  width: 76px;
-  height: 94px;
+  width: 68px;
+  height: 84px;
   border-radius: 8px;
   background: #e3ede7;
   border: 2px solid #ffffff;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  position: relative;
 }
 
 .studio-photo-thumb img {
@@ -345,15 +427,12 @@
   object-fit: cover;
 }
 
-.studio-photo-thumb svg {
-  color: #809c8d;
-}
-
 .studio-photo-details {
   flex: 1;
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-width: 0;
 }
 
 .studio-photo-actions {
@@ -366,15 +445,16 @@
 .btn-upload-photo {
   background: #236b4f;
   color: #ffffff;
-  padding: 6px 14px;
+  padding: 6px 12px;
   border-radius: 6px;
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   transition: all 0.2s;
+  white-space: nowrap;
 }
 
 .btn-upload-photo:hover {
@@ -385,12 +465,13 @@
   background: #ffffff;
   color: #4b6656;
   border: 1px solid #c0d8cb;
-  padding: 6px 10px;
+  padding: 5px 9px;
   border-radius: 6px;
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
+  white-space: nowrap;
 }
 
 .btn-revert-photo:hover {
@@ -401,10 +482,11 @@
 .studio-land-card {
   background: #f9fbf9;
   border: 1px solid #d6e5dd;
-  border-radius: 10px;
+  border-radius: 9px;
   padding: 10px 12px;
   margin-bottom: 10px;
-  position: relative;
+  box-sizing: border-box;
+  width: 100%;
 }
 
 .studio-land-header {
@@ -412,9 +494,9 @@
   align-items: center;
   justify-content: space-between;
   margin-bottom: 8px;
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 700;
-  color: #3b5f4c;
+  color: #2b543d;
 }
 
 .btn-del-land-row {
@@ -422,7 +504,7 @@
   color: #dc2626;
   border: 1px solid #fecaca;
   border-radius: 4px;
-  padding: 2px 6px;
+  padding: 2px 7px;
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
@@ -441,13 +523,14 @@
   color: #1b543e;
   border: 1.5px dashed #236b4f;
   border-radius: 8px;
-  font-weight: 600;
+  font-weight: 700;
   font-size: 12.5px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
+  box-sizing: border-box;
   transition: all 0.2s;
 }
 
@@ -460,45 +543,51 @@
    ========================================================================== */
 
 .studio-preview-col {
-  padding: 20px 24px;
+  padding: 18px 20px;
   display: flex;
   flex-direction: column;
   background: #eef4f0;
   overflow-y: auto;
+  overflow-x: hidden;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .studio-preview-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
   flex-shrink: 0;
+  box-sizing: border-box;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .studio-preview-header h3 {
   margin: 0;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
   color: #163628;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .studio-preview-tabs {
   display: flex;
   background: #dce7e1;
   padding: 3px;
-  border-radius: 8px;
+  border-radius: 7px;
   gap: 3px;
 }
 
 .preview-tab-btn {
   background: transparent;
   border: none;
-  padding: 4px 10px;
-  border-radius: 6px;
-  font-size: 11.5px;
+  padding: 3px 9px;
+  border-radius: 5px;
+  font-size: 11px;
   font-weight: 600;
   color: #3b5f4c;
   cursor: pointer;
@@ -508,7 +597,7 @@
 .preview-tab-btn.active {
   background: #ffffff;
   color: #123d2d;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 .studio-card-display-area {
@@ -516,11 +605,14 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 20px;
-  min-height: 480px;
-  padding: 10px 0;
+  gap: 18px;
+  min-height: 440px;
+  padding: 8px 0;
+  box-sizing: border-box;
+  width: 100%;
 }
 
+/* RESPONSIVE SCALED CARD WRAPPER (NEVER OVERFLOWS) */
 .studio-card-wrapper {
   width: 100%;
   max-width: 504px;
@@ -528,9 +620,10 @@
   position: relative;
   overflow: hidden;
   border-radius: 14px;
-  box-shadow: 0 14px 32px rgba(18, 61, 45, 0.16);
+  box-shadow: 0 12px 28px rgba(18, 61, 45, 0.16);
   background: #ffffff;
-  transition: all 0.25s ease;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
 }
 
 .studio-card-wrapper .scaled-card {
@@ -548,43 +641,49 @@
    ========================================================================== */
 
 .studio-footer {
-  padding: 14px 24px;
+  padding: 12px 20px;
   background: #ffffff;
   border-top: 1px solid #dce8e1;
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-shrink: 0;
+  box-sizing: border-box;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .studio-status-note {
-  font-size: 12px;
+  font-size: 11.5px;
   color: #557564;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  min-width: 0;
 }
 
 .studio-status-dot {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: #10b981;
+  flex-shrink: 0;
 }
 
 .studio-footer-buttons {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  flex-shrink: 0;
 }
 
 .btn-studio-cancel {
   background: #f1f5f3;
   color: #435b4e;
   border: 1px solid #cbdcd2;
-  padding: 9px 18px;
-  border-radius: 8px;
-  font-size: 13px;
+  padding: 8px 16px;
+  border-radius: 7px;
+  font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
@@ -598,42 +697,132 @@
   background: linear-gradient(135deg, #236b4f 0%, #154c37 100%);
   color: #ffffff;
   border: none;
-  padding: 10px 24px;
-  border-radius: 8px;
-  font-size: 13.5px;
+  padding: 9px 20px;
+  border-radius: 7px;
+  font-size: 13px;
   font-weight: 700;
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 8px;
-  box-shadow: 0 4px 14px rgba(35, 107, 79, 0.35);
+  gap: 7px;
+  box-shadow: 0 4px 12px rgba(35, 107, 79, 0.35);
   transition: all 0.2s;
+  white-space: nowrap;
 }
 
 .btn-studio-save:hover {
   background: linear-gradient(135deg, #1b543e 0%, #0d3626 100%);
-  box-shadow: 0 6px 18px rgba(35, 107, 79, 0.45);
-  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(35, 107, 79, 0.45);
 }
 
-.btn-studio-save:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
-}
+/* ==========================================================================
+   MOBILE & TABLET RESPONSIVE RULES (FREE ADJUSTMENT)
+   ========================================================================== */
 
-/* RESPONSIVE DESIGN */
-@media (max-width: 1024px) {
-  .studio-workspace {
-    grid-template-columns: 1fr;
-    overflow-y: auto;
+@media (max-width: 900px) {
+  .edit-studio-overlay {
+    padding: 0;
   }
+
+  .edit-studio-container {
+    width: 100vw;
+    height: 100vh;
+    max-height: 100vh;
+    border-radius: 0;
+    border: none;
+  }
+
+  .studio-header {
+    padding: 10px 14px;
+  }
+
+  .studio-title-info h2 {
+    font-size: 15px;
+  }
+
+  .studio-meta-subtext {
+    max-width: 220px;
+    font-size: 10.5px;
+  }
+
+  /* Show mobile view switcher */
+  .studio-mobile-nav {
+    display: flex;
+  }
+
+  /* Change grid to single tab-driven layout */
+  .studio-workspace {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
   .studio-form-col {
     border-right: none;
-    border-bottom: 1px solid #dbe6e0;
-    overflow-y: visible;
+    padding: 14px 14px;
+    flex: 1;
+    overflow-y: auto;
   }
+
   .studio-preview-col {
-    overflow-y: visible;
+    padding: 14px 14px;
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  /* Controlled by active mobile tab */
+  .studio-workspace[data-mobile-active="preview"] .studio-form-col {
+    display: none !important;
+  }
+
+  .studio-workspace[data-mobile-active="preview"] .studio-preview-col {
+    display: flex !important;
+  }
+
+  .studio-workspace[data-mobile-active="form"] .studio-form-col {
+    display: flex !important;
+  }
+
+  .studio-workspace[data-mobile-active="form"] .studio-preview-col {
+    display: none !important;
+  }
+
+  .studio-grid-2 {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .studio-grid-3 {
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: 8px;
+  }
+
+  .studio-footer {
+    padding: 10px 14px;
+  }
+
+  .studio-footer-buttons {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .btn-studio-save {
+    flex: 1;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 560px) {
+  .studio-grid-3 {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .diff-counter-pill {
+    display: none;
+  }
+
+  .btn-studio-revert {
+    padding: 5px 8px;
+    font-size: 11px;
   }
 }

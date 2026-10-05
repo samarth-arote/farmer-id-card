@@ -2,10 +2,10 @@
    FARMER CARD GENERATOR - DEDICATED EDIT STUDIO & PDF REPLACEMENT MANAGER
    (edit-manager.js)
    Standalone module for:
-   - Dedicated Full-screen Edit Studio Modal with live side-by-side card preview
-   - Pre-filled inputs with Original comparison badges & real-time diff tracking
-   - PDF photo extraction & QR code scanning
-   - In-place Supabase PDF replacement & Admin Console sync
+   - Dedicated Fullscreen Edit Studio with responsive mobile/tablet tab-free adjustment
+   - Multi-tier Land Details, Photo, & DOB extraction with 100% fallback guarantees
+   - Original comparison badges & real-time live preview auto-scaling
+   - In-place cloud Supabase PDF replacement & Admin Console sync
    ========================================================================== */
 
 class EditManager {
@@ -14,6 +14,7 @@ class EditManager {
     this.originalData = null;
     this.currentEditData = null;
     this.activeStudioView = "both"; // 'both', 'front', 'back'
+    this.activeMobileTab = "form";  // 'form' or 'preview'
     this.initEventListeners();
   }
 
@@ -34,6 +35,9 @@ class EditManager {
       this.bindButtons();
       this.bindStudioEvents();
     }
+    window.addEventListener("resize", () => {
+      this.updateStudioCardScale();
+    });
   }
 
   bindButtons() {
@@ -112,7 +116,7 @@ class EditManager {
     const viewTabs = document.querySelectorAll("[data-studio-view]");
     viewTabs.forEach((tab) => {
       if (!tab._bound) {
-        tab.addEventListener("click", (e) => {
+        tab.addEventListener("click", () => {
           viewTabs.forEach((t) => t.classList.remove("active"));
           tab.classList.add("active");
           this.setStudioView(tab.dataset.studioView);
@@ -121,12 +125,44 @@ class EditManager {
       }
     });
 
+    // Mobile / Tablet Tab Switcher
+    const btnNavForm = document.getElementById("btnNavForm");
+    const btnNavPreview = document.getElementById("btnNavPreview");
+    if (btnNavForm && !btnNavForm._bound) {
+      btnNavForm.addEventListener("click", () => this.setMobileNav("form"));
+      btnNavForm._bound = true;
+    }
+    if (btnNavPreview && !btnNavPreview._bound) {
+      btnNavPreview.addEventListener("click", () => this.setMobileNav("preview"));
+      btnNavPreview._bound = true;
+    }
+
     // Real-time Input Listeners
     const studioForm = document.getElementById("studioEditForm");
     if (studioForm && !studioForm._bound) {
       studioForm.addEventListener("input", (e) => this.onStudioInputChange(e));
       studioForm.addEventListener("change", (e) => this.onStudioInputChange(e));
       studioForm._bound = true;
+    }
+  }
+
+  setMobileNav(tabName) {
+    this.activeMobileTab = tabName;
+    const workspace = document.querySelector(".studio-workspace");
+    if (workspace) {
+      workspace.setAttribute("data-mobile-active", tabName);
+    }
+    const btnNavForm = document.getElementById("btnNavForm");
+    const btnNavPreview = document.getElementById("btnNavPreview");
+    if (btnNavForm && btnNavPreview) {
+      if (tabName === "form") {
+        btnNavForm.classList.add("active");
+        btnNavPreview.classList.remove("active");
+      } else {
+        btnNavPreview.classList.add("active");
+        btnNavForm.classList.remove("active");
+        setTimeout(() => this.updateStudioCardScale(), 50);
+      }
     }
   }
 
@@ -205,6 +241,9 @@ class EditManager {
     let district = "";
     let taluka = "";
     let village = "";
+    let gatNo = "";
+    let khateNo = "";
+    let area = "";
 
     const distMatch = address.match(/(?:dist\.?|district|जिल्हा)\s*[:\-]?\s*([a-zA-Z\u0900-\u097F]+)/i);
     if (distMatch) district = distMatch[1].trim();
@@ -222,7 +261,16 @@ class EditManager {
       }
     }
 
-    return { district, taluka, village };
+    const gatMatch = address.match(/(?:gat\s*(?:no\.?|नं\.?)?|गट\s*(?:नं\.?)?)\s*[:\-]?\s*([0-9\u0966-\u096F\/\-]+)/i);
+    if (gatMatch) gatNo = gatMatch[1].trim();
+
+    const khateMatch = address.match(/(?:khate\s*(?:no\.?|नं\.?)?|खाते\s*(?:नं\.?)?)\s*[:\-]?\s*([0-9\u0966-\u096F\/\-]+)/i);
+    if (khateMatch) khateNo = khateMatch[1].trim();
+
+    const areaMatch = address.match(/(?:area|क्षेत्र)\s*[:\-]?\s*([0-9\u0966-\u096F\.\,]+)/i);
+    if (areaMatch) area = areaMatch[1].trim();
+
+    return { district, taluka, village, gatNo, khateNo, area };
   }
 
   // ==========================================================================
@@ -240,10 +288,10 @@ class EditManager {
     const stages = [
       {
         name: "Focused QR Box",
-        sx: Math.floor(w * 0.36),
-        sy: Math.floor(h * 0.10),
-        sw: Math.floor(w * 0.20),
-        sh: Math.floor(h * 0.38)
+        sx: Math.floor(w * 0.35),
+        sy: Math.floor(h * 0.08),
+        sw: Math.floor(w * 0.22),
+        sh: Math.floor(h * 0.42)
       },
       {
         name: "Front Card Half",
@@ -391,9 +439,9 @@ class EditManager {
 
       let photoDataUrl = embeddedMeta && embeddedMeta.photoDataUrl ? embeddedMeta.photoDataUrl : null;
       if (!photoDataUrl) {
-        const cropX = Math.round(canvas.width * 0.06);
+        const cropX = Math.round(canvas.width * 0.055);
         const cropY = Math.round(canvas.height * 0.125);
-        const cropW = Math.round(canvas.width * 0.285);
+        const cropW = Math.round(canvas.width * 0.29);
         const cropH = Math.round(canvas.height * 0.33);
 
         const cropCanvas = document.createElement("canvas");
@@ -423,68 +471,10 @@ class EditManager {
     }
   }
 
-  applyCardMeta(meta) {
-    if (!meta) return;
-    const form = document.getElementById("cardForm") || document.getElementById("farmerForm");
-    if (!form) return;
-
-    if (meta.englishName && form.elements.englishName && !form.elements.englishName.value) {
-      form.elements.englishName.value = meta.englishName;
-    }
-    if (meta.marathiName && form.elements.marathiName && !form.elements.marathiName.value) {
-      form.elements.marathiName.value = meta.marathiName;
-    }
-    if (meta.aadhaar && form.elements.aadhaar && !form.elements.aadhaar.value) {
-      if (window.formatAadhaar) form.elements.aadhaar.value = window.formatAadhaar(meta.aadhaar);
-      else form.elements.aadhaar.value = meta.aadhaar;
-    }
-    if (meta.cardNumber && form.elements.cardNumber && !form.elements.cardNumber.value) {
-      if (window.formatCardNumber) form.elements.cardNumber.value = window.formatCardNumber(meta.cardNumber);
-      else form.elements.cardNumber.value = meta.cardNumber;
-    }
-    if (meta.mobile && form.elements.mobile && !form.elements.mobile.value) {
-      form.elements.mobile.value = meta.mobile;
-    }
-    if (meta.gender && form.elements.gender) {
-      form.elements.gender.value = meta.gender;
-    }
-
-    if (meta.dob) {
-      this.applyDob(meta.dob);
-    } else if (meta.dobDate) {
-      this.applyDob(meta.dobDate);
-    }
-
-    if (meta.address && form.elements.address) {
-      form.elements.address.value = meta.address;
-    }
-
-    if (meta.photoDataUrl && window.setPhotoDataUrl) {
-      window.setPhotoDataUrl(meta.photoDataUrl);
-      const photoNameSpan = document.getElementById("photoFileName");
-      if (photoNameSpan) photoNameSpan.textContent = "Saved Photo Loaded (Click to replace)";
-    }
-
-    const landRowsEl = document.getElementById("landRows");
-    if (Array.isArray(meta.lands) && meta.lands.length > 0 && landRowsEl && window.createLandRowHtml) {
-      landRowsEl.innerHTML = "";
-      meta.lands.forEach((l, idx) => {
-        landRowsEl.insertAdjacentHTML("beforeend", window.createLandRowHtml(idx, l));
-      });
-    } else if (meta.address && landRowsEl && window.createLandRowHtml) {
-      const loc = this.extractLocationFromAddress(meta.address);
-      if (loc) {
-        landRowsEl.innerHTML = "";
-        landRowsEl.insertAdjacentHTML("beforeend", window.createLandRowHtml(0, {
-          district: loc.district || "अहिल्यानगर",
-          taluka: loc.taluka || "अकोले",
-          village: loc.village || "ब्राम्हणवाडा",
-          gatNo: "",
-          khateNo: "",
-          area: ""
-        }));
-      }
-    }
+  // Helper to determine if lands array has real user-entered content (not just blank placeholder)
+  hasCompleteLands(lands) {
+    if (!Array.isArray(lands) || lands.length === 0) return false;
+    return lands.some((l) => (l.gatNo && l.gatNo.toString().trim()) || (l.khateNo && l.khateNo.toString().trim()) || (l.area && l.area.toString().trim()));
   }
 
   // ==========================================================================
@@ -494,72 +484,90 @@ class EditManager {
   async startEdit(record) {
     this.currentEditingRecord = record;
 
+    // Reset view to form on mobile
+    this.setMobileNav("form");
+
     // Open Edit Studio Modal immediately
     this.openStudioModal(record);
 
-    // Also update background form banner for consistency
-    const banner = document.getElementById("editModeBanner");
-    const bannerTitle = document.getElementById("editBannerTitle");
-    if (banner) banner.classList.remove("hidden");
-    if (bannerTitle) {
-      bannerTitle.textContent = `Modifying: ${record.english_name || "Farmer"} (Card: ${record.card_number || "N/A"})`;
-    }
-
-    const downloadBtn = document.getElementById("downloadBtn");
-    if (downloadBtn) {
-      downloadBtn.innerHTML = `
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-          <polyline points="17 21 17 13 7 13 7 21"></polyline>
-          <polyline points="7 3 7 8 15 8"></polyline>
-        </svg>
-        Update & Replace PDF
-      `;
-      downloadBtn.classList.add("btn-edit-mode");
-    }
-
-    const form = document.getElementById("cardForm") || document.getElementById("farmerForm");
-    if (form) {
-      if (form.elements.marathiName) form.elements.marathiName.value = record.marathi_name || "";
-      if (form.elements.englishName) form.elements.englishName.value = record.english_name || "";
-      if (form.elements.aadhaar) form.elements.aadhaar.value = window.formatAadhaar ? window.formatAadhaar(record.aadhaar || "") : (record.aadhaar || "");
-      if (form.elements.cardNumber) form.elements.cardNumber.value = window.formatCardNumber ? window.formatCardNumber(record.card_number || "") : (record.card_number || "");
-      if (form.elements.mobile) form.elements.mobile.value = record.mobile || "";
-    }
-
-    // Reset background photo state
-    if (window.setPhotoDataUrl) window.setPhotoDataUrl("");
+    // Initial basic populate from database record row
+    let resolved = {
+      marathiName: record.marathi_name || "",
+      englishName: record.english_name || "",
+      dob: "01-01-1973",
+      dobDate: "1973-01-01",
+      gender: "Male",
+      mobile: record.mobile || "",
+      aadhaar: window.formatAadhaar ? window.formatAadhaar(record.aadhaar || "") : (record.aadhaar || ""),
+      cardNumber: window.formatCardNumber ? window.formatCardNumber(record.card_number || "") : (record.card_number || ""),
+      address: "Bramhanwada tal akole dist ahilyanagar",
+      photoDataUrl: "",
+      lands: [
+        { district: "अहिल्यानगर", taluka: "अकोले", village: "ब्राम्हणवाडा", gatNo: "", khateNo: "", area: "" }
+      ]
+    };
 
     // Step 1: Check local storage metadata
-    let meta = null;
+    let localMeta = null;
     try {
       const raw = (record.id && localStorage.getItem(`farmer_card_meta_${record.id}`)) ||
                   (record.storage_path && localStorage.getItem(`farmer_card_meta_${record.storage_path}`)) ||
                   (record.filename && localStorage.getItem(`farmer_card_meta_${record.filename}`));
-      if (raw) meta = JSON.parse(raw);
+      if (raw) localMeta = JSON.parse(raw);
     } catch (e) {}
 
-    if (meta) {
-      this.applyCardMeta(meta);
+    if (localMeta) {
+      if (localMeta.marathiName) resolved.marathiName = localMeta.marathiName;
+      if (localMeta.englishName) resolved.englishName = localMeta.englishName;
+      if (localMeta.dob) {
+        resolved.dob = this.formatDobDDMMYYYY(localMeta.dob);
+        resolved.dobDate = this.formatDobYYYYMMDD(localMeta.dob);
+      }
+      if (localMeta.gender) resolved.gender = localMeta.gender;
+      if (localMeta.mobile) resolved.mobile = localMeta.mobile;
+      if (localMeta.aadhaar) resolved.aadhaar = window.formatAadhaar ? window.formatAadhaar(localMeta.aadhaar) : localMeta.aadhaar;
+      if (localMeta.cardNumber) resolved.cardNumber = window.formatCardNumber ? window.formatCardNumber(localMeta.cardNumber) : localMeta.cardNumber;
+      if (localMeta.address) resolved.address = localMeta.address;
+      if (localMeta.photoDataUrl) resolved.photoDataUrl = localMeta.photoDataUrl;
+      if (this.hasCompleteLands(localMeta.lands)) {
+        resolved.lands = JSON.parse(JSON.stringify(localMeta.lands));
+      }
     }
 
     const storagePath = record.storage_path || record.filename;
-    let currentPhoto = (meta && meta.photoDataUrl) || "";
 
-    // Step 2: Try cloud companion metadata if needed
-    if ((!currentPhoto || !meta || !meta.dob) && window.supabaseManager && window.supabaseManager.getCardMetadata) {
+    // Step 2: Query Cloud companion metadata (Storage meta.json)
+    // ALWAYS attempt cloud metadata if lands is missing/incomplete or photo is missing
+    const needsCloudLookup = !this.hasCompleteLands(resolved.lands) || !resolved.photoDataUrl || !localMeta || !localMeta.dob;
+    if (needsCloudLookup && window.supabaseManager && window.supabaseManager.getCardMetadata) {
       try {
-        const cloudMeta = await window.supabaseManager.getCardMetadata(storagePath);
+        const cloudMeta = (await window.supabaseManager.getCardMetadata(storagePath)) ||
+                          (record.filename && record.filename !== storagePath ? await window.supabaseManager.getCardMetadata(record.filename) : null);
         if (cloudMeta) {
-          meta = { ...(meta || {}), ...cloudMeta };
-          this.applyCardMeta(cloudMeta);
-          if (cloudMeta.photoDataUrl) currentPhoto = cloudMeta.photoDataUrl;
+          if (cloudMeta.marathiName) resolved.marathiName = cloudMeta.marathiName;
+          if (cloudMeta.englishName) resolved.englishName = cloudMeta.englishName;
+          if (cloudMeta.dob) {
+            resolved.dob = this.formatDobDDMMYYYY(cloudMeta.dob);
+            resolved.dobDate = this.formatDobYYYYMMDD(cloudMeta.dob);
+          }
+          if (cloudMeta.gender) resolved.gender = cloudMeta.gender;
+          if (cloudMeta.mobile) resolved.mobile = cloudMeta.mobile;
+          if (cloudMeta.aadhaar) resolved.aadhaar = window.formatAadhaar ? window.formatAadhaar(cloudMeta.aadhaar) : cloudMeta.aadhaar;
+          if (cloudMeta.cardNumber) resolved.cardNumber = window.formatCardNumber ? window.formatCardNumber(cloudMeta.cardNumber) : cloudMeta.cardNumber;
+          if (cloudMeta.address) resolved.address = cloudMeta.address;
+          if (cloudMeta.photoDataUrl) resolved.photoDataUrl = cloudMeta.photoDataUrl;
+          if (this.hasCompleteLands(cloudMeta.lands)) {
+            resolved.lands = JSON.parse(JSON.stringify(cloudMeta.lands));
+          }
         }
-      } catch (e) {}
+      } catch (e) {
+        console.warn("Cloud metadata lookup error:", e);
+      }
     }
 
-    // Step 3: Extract from PDF and QR code if still missing photo or DOB or address
-    if (!currentPhoto || !meta || !meta.dob || !meta.address) {
+    // Step 3: Extract from PDF file directly (Embedded metadata, QR code, and photo crop)
+    const needsPdfLookup = !this.hasCompleteLands(resolved.lands) || !resolved.photoDataUrl || !resolved.dob || resolved.dob === "01-01-1973";
+    if (needsPdfLookup) {
       try {
         let pdfUrl = record.public_url;
         if (!pdfUrl && window.supabaseManager && storagePath) {
@@ -570,78 +578,58 @@ class EditManager {
         if (pdfUrl) {
           const extracted = await this.extractFullCardDataFromPdf(pdfUrl);
           if (extracted) {
-            meta = { ...(meta || {}), ...extracted };
-            this.applyCardMeta(extracted);
-            if (extracted.photoDataUrl) currentPhoto = extracted.photoDataUrl;
+            if (extracted.photoDataUrl && !resolved.photoDataUrl) {
+              resolved.photoDataUrl = extracted.photoDataUrl;
+            }
+            if (extracted.dob) {
+              resolved.dob = this.formatDobDDMMYYYY(extracted.dob);
+              resolved.dobDate = this.formatDobYYYYMMDD(extracted.dob);
+            }
+            if (extracted.gender) resolved.gender = extracted.gender;
+            if (extracted.address && (!resolved.address || resolved.address === "Bramhanwada tal akole dist ahilyanagar")) {
+              resolved.address = extracted.address;
+            }
+            if (this.hasCompleteLands(extracted.lands)) {
+              resolved.lands = JSON.parse(JSON.stringify(extracted.lands));
+            }
           }
         }
       } catch (err) {
-        console.warn("Could not extract full card details from PDF:", err);
+        console.warn("PDF extraction lookup error:", err);
       }
     }
 
-    // Step 4: Build unified resolved data object
-    const finalDob = (meta && meta.dob) || "01-01-1973";
-    const finalDobDate = this.formatDobYYYYMMDD(finalDob) || "1973-01-01";
-    const finalDobDisplay = this.formatDobDDMMYYYY(finalDob);
-
-    let finalLands = [];
-    if (meta && Array.isArray(meta.lands) && meta.lands.length > 0) {
-      finalLands = JSON.parse(JSON.stringify(meta.lands));
-    } else if (meta && meta.address) {
-      const loc = this.extractLocationFromAddress(meta.address);
+    // Step 4: If lands are STILL missing or empty, parse address for district/taluka/village/gat/khate/area
+    if (!this.hasCompleteLands(resolved.lands) && resolved.address) {
+      const loc = this.extractLocationFromAddress(resolved.address);
       if (loc) {
-        finalLands = [{
+        resolved.lands = [{
           district: loc.district || "अहिल्यानगर",
           taluka: loc.taluka || "अकोले",
           village: loc.village || "ब्राम्हणवाडा",
-          gatNo: "",
-          khateNo: "",
-          area: ""
+          gatNo: loc.gatNo || "",
+          khateNo: loc.khateNo || "",
+          area: loc.area || ""
         }];
       }
     }
-    if (finalLands.length === 0) {
-      finalLands = [{
-        district: "अहिल्यानगर",
-        taluka: "अकोले",
-        village: "ब्राम्हणवाडा",
-        gatNo: "",
-        khateNo: "",
-        area: ""
-      }];
-    }
 
-    const resolved = {
-      marathiName: (meta && meta.marathiName) || record.marathi_name || "",
-      englishName: (meta && meta.englishName) || record.english_name || "",
-      dob: finalDobDisplay,
-      dobDate: finalDobDate,
-      gender: (meta && meta.gender) || "Male",
-      mobile: (meta && meta.mobile) || record.mobile || "",
-      aadhaar: window.formatAadhaar ? window.formatAadhaar((meta && meta.aadhaar) || record.aadhaar || "") : ((meta && meta.aadhaar) || record.aadhaar || ""),
-      cardNumber: window.formatCardNumber ? window.formatCardNumber((meta && meta.cardNumber) || record.card_number || "") : ((meta && meta.cardNumber) || record.card_number || ""),
-      address: (meta && meta.address) || "Bramhanwada tal akole dist ahilyanagar",
-      photoDataUrl: currentPhoto || "",
-      lands: finalLands
-    };
-
-    // Store immutable copy of original data for diff comparisons
+    // Store immutable copy of original data for diff comparison
     this.originalData = JSON.parse(JSON.stringify(resolved));
     this.currentEditData = JSON.parse(JSON.stringify(resolved));
 
-    // Populate Studio Interface
+    // Populate the Studio interface
     this.populateStudioData();
 
-    // Sync background card
-    if (window.setPhotoDataUrl) window.setPhotoDataUrl(resolved.photoDataUrl);
-    if (window.renderCard) window.renderCard();
-
-    // Cache to localStorage
+    // Cache updated complete metadata to localStorage
     try {
       if (record.id) localStorage.setItem(`farmer_card_meta_${record.id}`, JSON.stringify(resolved));
       if (storagePath) localStorage.setItem(`farmer_card_meta_${storagePath}`, JSON.stringify(resolved));
     } catch (e) {}
+
+    // Synchronize background form and preview
+    if (window.setPhotoDataUrl) window.setPhotoDataUrl(resolved.photoDataUrl);
+    if (window.renderCard) window.renderCard();
   }
 
   openStudioModal(record) {
@@ -651,12 +639,12 @@ class EditManager {
     modal.classList.remove("hidden");
     const subTitle = document.getElementById("studioRecordSubtitle");
     if (subTitle) {
-      subTitle.textContent = `Modifying: ${record.english_name || "Farmer"} (Card: ${record.card_number || "N/A"}) • Created: ${record.created_at ? new Date(record.created_at).toLocaleDateString() : "Saved"}`;
+      subTitle.textContent = `Modifying: ${record.english_name || "Farmer"} (Card: ${record.card_number || "N/A"})`;
     }
 
     const statusNote = document.getElementById("studioFooterStatus");
     if (statusNote) {
-      statusNote.textContent = "Loading original card details...";
+      statusNote.textContent = "Loading original card details & land records...";
     }
   }
 
@@ -707,7 +695,7 @@ class EditManager {
 
     const statusNote = document.getElementById("studioFooterStatus");
     if (statusNote) {
-      statusNote.textContent = "Original farmer card data loaded. Modify any fields and click Replace to apply.";
+      statusNote.textContent = "All original farmer details & land records loaded. Ready to modify.";
     }
   }
 
@@ -996,6 +984,26 @@ class EditManager {
         backWrap.classList.remove("hidden");
       }
     }
+    this.updateStudioCardScale();
+  }
+
+  updateStudioCardScale() {
+    const wrappers = document.querySelectorAll(".studio-card-wrapper");
+    wrappers.forEach((w) => {
+      const containerWidth = w.parentElement ? w.parentElement.clientWidth - 20 : 500;
+      const targetWidth = 1008;
+      const maxScale = 0.5;
+      const availableWidth = Math.min(504, Math.max(260, containerWidth));
+      const scale = Math.min(maxScale, availableWidth / targetWidth);
+
+      w.style.width = `${targetWidth * scale}px`;
+      w.style.height = `${650 * scale}px`;
+
+      const scaledCard = w.querySelector(".scaled-card");
+      if (scaledCard) {
+        scaledCard.style.transform = `scale(${scale})`;
+      }
+    });
   }
 
   renderStudioLivePreview() {
@@ -1034,6 +1042,9 @@ class EditManager {
 
     // Restore background bridge photo
     if (window.setPhotoDataUrl) window.setPhotoDataUrl(oldBridgePhoto);
+
+    // Auto-scale to fit current screen size
+    this.updateStudioCardScale();
   }
 
   onStudioSaveClick() {
