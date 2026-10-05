@@ -1303,18 +1303,30 @@ class EditManager {
   updateStudioCardScale() {
     const wrappers = document.querySelectorAll(".studio-card-wrapper");
     wrappers.forEach((w) => {
-      const containerWidth = w.parentElement ? w.parentElement.clientWidth - 20 : 500;
+      const parent = w.parentElement;
+      const previewCol = document.querySelector(".studio-preview-col");
+      const colWidth = (previewCol && previewCol.clientWidth > 50)
+        ? (previewCol.clientWidth - 40)
+        : (parent && parent.clientWidth > 50 ? parent.clientWidth - 20 : 504);
       const targetWidth = 1008;
+      const targetHeight = 650;
       const maxScale = 0.5;
-      const availableWidth = Math.min(504, Math.max(260, containerWidth));
+      const availableWidth = Math.min(504, Math.max(260, colWidth));
       const scale = Math.min(maxScale, availableWidth / targetWidth);
 
-      w.style.width = `${targetWidth * scale}px`;
-      w.style.height = `${650 * scale}px`;
+      const renderedW = Math.round(targetWidth * scale);
+      const renderedH = Math.round(targetHeight * scale);
+
+      w.style.width = `${renderedW}px`;
+      w.style.height = `${renderedH}px`;
+      w.style.maxWidth = `${renderedW}px`;
 
       const scaledCard = w.querySelector(".scaled-card");
       if (scaledCard) {
+        scaledCard.style.width = `${targetWidth}px`;
+        scaledCard.style.height = `${targetHeight}px`;
         scaledCard.style.transform = `scale(${scale})`;
+        scaledCard.style.transformOrigin = "top left";
       }
     });
   }
