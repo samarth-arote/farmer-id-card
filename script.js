@@ -290,7 +290,23 @@ function formData() {
 }
 
 function qrPayload(data) {
-  return [`Name: ${data.englishName}`, `DOB: ${data.dob}`, `Gender: ${data.gender}`, `Mobile: ${data.mobile}`, `Aadhaar: ${data.aadhaar}`, `Card: ${data.cardNumber}`, `Address: ${data.address}`].join("\n");
+  let landsStr = "";
+  if (Array.isArray(data.lands) && data.lands.length > 0) {
+    landsStr = data.lands.map(l => `${l.district || ""}|${l.taluka || ""}|${l.village || ""}|${l.gatNo || ""}|${l.khateNo || ""}|${l.area || ""}`).join(";");
+  }
+  const lines = [
+    `Name: ${data.englishName || ""}`,
+    `DOB: ${data.dob || ""}`,
+    `Gender: ${data.gender || "Male"}`,
+    `Mobile: ${data.mobile || ""}`,
+    `Aadhaar: ${data.aadhaar || ""}`,
+    `Card: ${data.cardNumber || ""}`,
+    `Address: ${data.address || ""}`
+  ];
+  if (landsStr) {
+    lines.push(`Lands: ${landsStr}`);
+  }
+  return lines.join("\n");
 }
 
 function formatDobDDMMYYYY(value) {
@@ -480,6 +496,12 @@ async function downloadPdf() {
         format: [152.4, 101.6]
     });
 
+    pdf.setProperties({
+        title: data.englishName || "Farmer Card",
+        subject: JSON.stringify({ ...data, photoDataUrl: photoDataUrl || "" }),
+        author: "Farmer Card Portal"
+    });
+
     const cardWidth = 85.60;
     const cardHeight = 53.98;
 
@@ -632,10 +654,203 @@ function hideReplacePdfModal() {
 }
 
 // ==========================================================================
-// PDF PHOTO EXTRACTION & CARD EDITING LOGIC
+// PDF PHOTO EXTRACTION, QR SCANNING & CARD EDITING LOGIC
 // ==========================================================================
 
-async function extractPhotoFromPdf(pdfUrlOrData) {
+function applyDob(dobStr) {
+  if (!dobStr) return;
+  const s = dobStr.toString().trim();
+  let dd = "", mm = "", yyyy = "";
+
+  const parts = s.split(/[-/.]/);
+  if (parts.length === 3) {
+    if (parts[0].length === 4) {
+      // YYYY-MM-DD
+      yyyy = parts[0];
+      mm = parts[1].padStart(2, "0");
+      dd = parts[2].padStart(2, "0");
+    } else if (parts[2].length === 4) {
+      // DD-MM-YYYY
+      dd = parts[0].padStart(2, "0");
+      mm = parts[1].padStart(2, "0");
+      yyyy = parts[2];
+    }
+  } else {
+    const digits = s.replace(/\D/g, "");
+    if (digits.length === 8) {
+      dd = digits.slice(0, 2);
+      mm = digits.slice(2, 4);
+      yyyy = digits.slice(4, 8);
+    }
+  }
+
+  if (yyyy && mm && dd) {
+    if (form.elements.dobDate) {
+      form.elements.dobDate.value = `${yyyy}-${mm}-${dd}`;
+    }
+    if (form.elements.dob) {
+      form.elements.dob.value = `${dd}-${mm}-${yyyy}`;
+    }
+  }
+}
+
+function extractLocationFromAddress(address) {
+  if (!address || typeof address !== "string") return null;
+  let district = "";
+  let taluka = "";
+  let village = "";
+
+  const distMatch = address.match(/(?:dist\.?|district|जिल्हा)\s*[:\-]?\s*([a-zA-Z\u0900-\u097F]+)/i);
+  if (distMatch) district = distMatch[1].trim();
+
+  const talMatch = address.match(/(?:tal\.?|taluka|तालुका)\s*[:\-]?\s*([a-zA-Z\u0900-\u097F]+)/i);
+  if (talMatch) taluka = talMatch[1].trim();
+
+  const villMatch = address.match(/(?:at post|a\/p|village|गाव|मु\.?\s*पो\.?)\s*[:\-]?\s*([a-zA-Z\u0900-\u097F]+)/i);
+  if (villMatch) village = villMatch[1].trim();
+  else {
+    const beforeTal = address.split(/(?:tal\.?|taluka|तालुका)/i)[0].trim();
+    if (beforeTal) {
+      const parts = beforeTal.split(/[\s,]+/);
+      village = parts[parts.length - 1];
+    }
+  }
+
+  const marathiMap = {
+    "ahilyanagar": "अहिल्यानगर",
+    "ahmednagar": "अहिल्यानगर",
+    "akole": "अकोले",
+    "sangamner": "संगमनेर",
+    "kopargaon": "कोपरगाव",
+    "shirdi": "शिर्डी",
+    "pune": "पुणे",
+    "nashik": "नाशिक",
+    "bramhanwada": "ब्राम्हणवाडा",
+    "brahmanwada": "ब्राम्हणवाडा"
+  };
+
+  const finalDist = marathiMap[district.toLowerCase()] || district || "अहिल्यानगर";
+  const finalTal = marathiMap[taluka.toLowerCase()] || taluka || "अकोले";
+  const finalVill = marathiMap[village.toLowerCase()] || village || "ब्राम्हणवाडा";
+
+  return { district: finalDist, taluka: finalTal, village: finalVill };
+}
+
+function decodeQrFromCanvas(canvas) {
+  const jsQR = window.jsQR;
+  if (!jsQR) {
+    console.warn("jsQR library not available");
+    return null;
+  }
+
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+
+  // On PDF Page 1 (101.6mm x 152.4mm portrait):
+  // Front card is at: x = 8.0 mm, y = 8.0 mm, w = 85.60 mm, h = 53.98 mm
+  // Inside the 1008x650 front card:
+  // QR box is at left: 795px, top: 274px, width: 190px, height: 188px
+  const cardX = (8.0 / 101.6) * canvas.width;
+  const cardY = (8.0 / 152.4) * canvas.height;
+  const cardW = (85.60 / 101.6) * canvas.width;
+  const cardH = (53.98 / 152.4) * canvas.height;
+
+  const qrLeft = cardX + (795 / 1008) * cardW;
+  const qrTop = cardY + (274 / 650) * cardH;
+  const qrWidth = (190 / 1008) * cardW;
+  const qrHeight = (188 / 650) * cardH;
+
+  // Add 15% quiet zone padding around the QR code
+  const pad = Math.round(qrWidth * 0.15);
+  const sx = Math.max(0, Math.round(qrLeft - pad));
+  const sy = Math.max(0, Math.round(qrTop - pad));
+  const sw = Math.min(canvas.width - sx, Math.round(qrWidth + pad * 2));
+  const sh = Math.min(canvas.height - sy, Math.round(qrHeight + pad * 2));
+
+  // Try 1: Scan focused QR region
+  try {
+    const imgData = ctx.getImageData(sx, sy, sw, sh);
+    const code = jsQR(imgData.data, imgData.width, imgData.height, { inversionAttempts: "attemptBoth" });
+    if (code && code.data) return code.data;
+  } catch (e) {}
+
+  // Try 2: Scan full right half of front card
+  try {
+    const halfX = Math.round(cardX + cardW * 0.5);
+    const halfW = Math.round(cardW * 0.5);
+    const imgData2 = ctx.getImageData(halfX, Math.round(cardY), halfW, Math.round(cardH));
+    const code2 = jsQR(imgData2.data, imgData2.width, imgData2.height, { inversionAttempts: "attemptBoth" });
+    if (code2 && code2.data) return code2.data;
+  } catch (e) {}
+
+  // Try 3: Scan entire front card
+  try {
+    const frontImgData = ctx.getImageData(Math.round(cardX), Math.round(cardY), Math.round(cardW), Math.round(cardH));
+    const code3 = jsQR(frontImgData.data, frontImgData.width, frontImgData.height, { inversionAttempts: "attemptBoth" });
+    if (code3 && code3.data) return code3.data;
+  } catch (e) {}
+
+  // Try 4: Scan entire canvas
+  try {
+    const fullImgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const code4 = jsQR(fullImgData.data, fullImgData.width, fullImgData.height, { inversionAttempts: "attemptBoth" });
+    if (code4 && code4.data) return code4.data;
+  } catch (e) {}
+
+  return null;
+}
+
+function parseQrPayload(text) {
+  if (!text || typeof text !== "string") return {};
+  const res = {};
+
+  const dobMatch = text.match(/DOB:\s*([^\n\r]+)/i);
+  if (dobMatch) res.dob = dobMatch[1].trim();
+
+  const genderMatch = text.match(/Gender:\s*([^\n\r]+)/i);
+  if (genderMatch) res.gender = genderMatch[1].trim();
+
+  const addressMatch = text.match(/Address:\s*([\s\S]+?)(?=(?:\n(?:Lands|Card|DOB|Gender|Mobile|Aadhaar):)|$)/i);
+  if (addressMatch) res.address = addressMatch[1].trim();
+
+  const landsMatch = text.match(/Lands:\s*([^\n\r]+)/i);
+  if (landsMatch) {
+    try {
+      const rawLands = landsMatch[1].trim();
+      if (rawLands.startsWith("[") || rawLands.startsWith("{")) {
+        res.lands = JSON.parse(rawLands);
+      } else {
+        const rows = rawLands.split(";").filter(Boolean);
+        res.lands = rows.map((r) => {
+          const c = r.split("|");
+          return {
+            district: c[0] || "",
+            taluka: c[1] || "",
+            village: c[2] || "",
+            gatNo: c[3] || "",
+            khateNo: c[4] || "",
+            area: c[5] || ""
+          };
+        });
+      }
+    } catch (e) {}
+  }
+
+  const mobileMatch = text.match(/Mobile:\s*([^\n\r]+)/i);
+  if (mobileMatch) res.mobile = mobileMatch[1].trim();
+
+  const aadhaarMatch = text.match(/Aadhaar:\s*([^\n\r]+)/i);
+  if (aadhaarMatch) res.aadhaar = aadhaarMatch[1].trim();
+
+  const cardMatch = text.match(/Card:\s*([^\n\r]+)/i);
+  if (cardMatch) res.cardNumber = cardMatch[1].trim();
+
+  const nameMatch = text.match(/Name:\s*([^\n\r]+)/i);
+  if (nameMatch) res.englishName = nameMatch[1].trim();
+
+  return res;
+}
+
+async function extractFullCardDataFromPdf(pdfUrlOrData) {
   try {
     const pdfLib = window.pdfjsLib || window["pdfjs-dist/build/pdf"];
     if (!pdfLib) {
@@ -662,6 +877,18 @@ async function extractPhotoFromPdf(pdfUrlOrData) {
     const pdfDoc = await loadingTask.promise;
     if (pdfDoc.numPages < 1) return null;
 
+    // Check embedded document metadata first
+    let embeddedMeta = null;
+    try {
+      const docMeta = await pdfDoc.getMetadata();
+      if (docMeta && docMeta.info && docMeta.info.Subject) {
+        const parsed = JSON.parse(docMeta.info.Subject);
+        if (parsed && typeof parsed === "object") {
+          embeddedMeta = parsed;
+        }
+      }
+    } catch (e) {}
+
     const page = await pdfDoc.getPage(1);
     const scale = 2.5;
     const viewport = page.getViewport({ scale });
@@ -673,12 +900,7 @@ async function extractPhotoFromPdf(pdfUrlOrData) {
 
     await page.render({ canvasContext: ctx, viewport }).promise;
 
-    // Card placement in PDF:
-    // Page: 101.6 mm x 152.4 mm (portrait)
-    // Front card: x = 8.0 mm, y = 8.0 mm, w = 85.60 mm, h = 53.98 mm
-    // Inside front card (1008px x 650px):
-    // photo box is left: 25px, top: 137px, width: 203px, height: 200px
-    // 4px border inset inside photo box: left: 29px, top: 141px, width: 195px, height: 192px
+    // 1. Crop and extract Photo from the front card photo box
     const cardX_mm = 8.0;
     const cardY_mm = 8.0;
     const cardW_mm = 85.60;
@@ -705,34 +927,91 @@ async function extractPhotoFromPdf(pdfUrlOrData) {
     const outCtx = outCanvas.getContext("2d");
     outCtx.drawImage(canvas, cropX, cropY, cropW, cropH, 0, 0, 300, 300);
 
-    return outCanvas.toDataURL("image/jpeg", 0.92);
+    const extractedPhoto = outCanvas.toDataURL("image/jpeg", 0.92);
+
+    // 2. Decode the QR code from the front card
+    let qrData = {};
+    const qrText = decodeQrFromCanvas(canvas);
+    if (qrText) {
+      qrData = parseQrPayload(qrText);
+    }
+
+    return {
+      photoDataUrl: (embeddedMeta && embeddedMeta.photoDataUrl) || extractedPhoto || "",
+      dob: (embeddedMeta && (embeddedMeta.dob || embeddedMeta.dobDate)) || qrData.dob || "",
+      dobDate: (embeddedMeta && embeddedMeta.dobDate) || "",
+      gender: (embeddedMeta && embeddedMeta.gender) || qrData.gender || "Male",
+      address: (embeddedMeta && embeddedMeta.address) || qrData.address || "",
+      lands: (embeddedMeta && embeddedMeta.lands) || qrData.lands || null,
+      englishName: (embeddedMeta && embeddedMeta.englishName) || qrData.englishName || "",
+      marathiName: (embeddedMeta && embeddedMeta.marathiName) || "",
+      mobile: (embeddedMeta && embeddedMeta.mobile) || qrData.mobile || "",
+      aadhaar: (embeddedMeta && embeddedMeta.aadhaar) || qrData.aadhaar || "",
+      cardNumber: (embeddedMeta && embeddedMeta.cardNumber) || qrData.cardNumber || ""
+    };
   } catch (err) {
-    console.error("Error extracting photo from PDF:", err);
+    console.error("Error extracting card details from PDF:", err);
     return null;
   }
 }
 
 function applyCardMeta(meta) {
   if (!meta) return;
-  if (meta.gender && form.elements.gender) form.elements.gender.value = meta.gender;
-  if (meta.dob && form.elements.dob) form.elements.dob.value = meta.dob;
-  if (meta.dob && form.elements.dobDate) {
-    const parts = meta.dob.split("-");
-    if (parts.length === 3) {
-      form.elements.dobDate.value = `${parts[2]}-${parts[1]}-${parts[0]}`;
-    }
+
+  if (meta.englishName && form.elements.englishName && !form.elements.englishName.value) {
+    form.elements.englishName.value = meta.englishName;
   }
-  if (meta.address && form.elements.address) form.elements.address.value = meta.address;
+  if (meta.marathiName && form.elements.marathiName && !form.elements.marathiName.value) {
+    form.elements.marathiName.value = meta.marathiName;
+  }
+  if (meta.aadhaar && form.elements.aadhaar && !form.elements.aadhaar.value) {
+    form.elements.aadhaar.value = formatAadhaar(meta.aadhaar);
+  }
+  if (meta.cardNumber && form.elements.cardNumber && !form.elements.cardNumber.value) {
+    form.elements.cardNumber.value = formatCardNumber(meta.cardNumber);
+  }
+  if (meta.mobile && form.elements.mobile && !form.elements.mobile.value) {
+    form.elements.mobile.value = meta.mobile;
+  }
+
+  if (meta.gender && form.elements.gender) {
+    form.elements.gender.value = meta.gender;
+  }
+
+  if (meta.dob) {
+    applyDob(meta.dob);
+  } else if (meta.dobDate) {
+    applyDob(meta.dobDate);
+  }
+
+  if (meta.address && form.elements.address) {
+    form.elements.address.value = meta.address;
+  }
+
   if (meta.photoDataUrl) {
     photoDataUrl = meta.photoDataUrl;
     const photoNameSpan = document.getElementById("photoFileName");
     if (photoNameSpan) photoNameSpan.textContent = "Saved Photo Loaded (Click to replace)";
   }
+
   if (Array.isArray(meta.lands) && meta.lands.length > 0) {
     landRowsEl.innerHTML = "";
     meta.lands.forEach((l, idx) => {
       landRowsEl.insertAdjacentHTML("beforeend", createLandRowHtml(idx, l));
     });
+  } else if (meta.address) {
+    const loc = extractLocationFromAddress(meta.address);
+    if (loc && landRowsEl) {
+      landRowsEl.innerHTML = "";
+      landRowsEl.insertAdjacentHTML("beforeend", createLandRowHtml(0, {
+        district: loc.district || "अहिल्यानगर",
+        taluka: loc.taluka || "अकोले",
+        village: loc.village || "ब्राम्हणवाडा",
+        gatNo: "",
+        khateNo: "",
+        area: ""
+      }));
+    }
   }
 }
 
@@ -758,18 +1037,19 @@ window.startEditPdfRecord = async function(record) {
     downloadBtn.classList.add("btn-edit-mode");
   }
 
+  // 1. Populate basic DB fields
   if (form.elements.marathiName) form.elements.marathiName.value = record.marathi_name || "";
   if (form.elements.englishName) form.elements.englishName.value = record.english_name || "";
   if (form.elements.aadhaar) form.elements.aadhaar.value = formatAadhaar(record.aadhaar || "");
   if (form.elements.cardNumber) form.elements.cardNumber.value = formatCardNumber(record.card_number || "");
   if (form.elements.mobile) form.elements.mobile.value = record.mobile || "";
 
-  // Reset photo state for fresh edit session
+  // Reset photo and loading status
   photoDataUrl = "";
   const photoNameSpan = document.getElementById("photoFileName");
-  if (photoNameSpan) photoNameSpan.textContent = "Loading saved photo...";
+  if (photoNameSpan) photoNameSpan.textContent = "Loading saved card data & photo...";
 
-  // 1. Look for stored metadata in localStorage first
+  // 2. Check local storage metadata first
   let meta = null;
   try {
     const raw = (record.id && localStorage.getItem(`farmer_card_meta_${record.id}`)) ||
@@ -787,73 +1067,102 @@ window.startEditPdfRecord = async function(record) {
   const formPanel = document.querySelector(".form-panel");
   if (formPanel) formPanel.scrollTop = 0;
 
-  // 2. If photo is not loaded from localStorage, retrieve from Cloud Storage or extract from PDF
-  if (!photoDataUrl) {
-    const storagePath = record.storage_path || record.filename;
+  const storagePath = record.storage_path || record.filename;
 
-    // 2a. Try companion metadata in Cloud Storage
-    if (window.supabaseManager && window.supabaseManager.getCardMetadata) {
-      try {
-        const cloudMeta = await window.supabaseManager.getCardMetadata(storagePath);
-        if (cloudMeta) {
-          applyCardMeta(cloudMeta);
+  // 3. Try cloud companion metadata if needed
+  if ((!photoDataUrl || !form.elements.dobDate.value) && window.supabaseManager && window.supabaseManager.getCardMetadata) {
+    try {
+      const cloudMeta = await window.supabaseManager.getCardMetadata(storagePath);
+      if (cloudMeta) {
+        applyCardMeta(cloudMeta);
+        render();
+      }
+    } catch (e) {}
+  }
+
+  // 4. Try cloud companion photo if still missing photo
+  if (!photoDataUrl && window.supabaseManager && window.supabaseManager.getCardPhotoBlob) {
+    try {
+      const photoBlob = await window.supabaseManager.getCardPhotoBlob(storagePath);
+      if (photoBlob) {
+        await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            photoDataUrl = reader.result;
+            if (photoNameSpan) photoNameSpan.textContent = "Saved Photo Loaded (Click to replace)";
+            render();
+            resolve();
+          };
+          reader.onerror = resolve;
+          reader.readAsDataURL(photoBlob);
+        });
+      }
+    } catch (e) {}
+  }
+
+  // 5. If DOB, Photo, or Back Info (Address/Lands) is missing, extract directly from the PDF!
+  const needsPdfExtraction = !photoDataUrl || !form.elements.dobDate.value || !form.elements.address.value || form.elements.address.value === "Bramhanwada tal akole dist ahilyanagar";
+
+  if (needsPdfExtraction) {
+    try {
+      let pdfUrl = record.public_url || "";
+      if (window.supabaseManager && window.supabaseManager.getPdfUrl) {
+        pdfUrl = await window.supabaseManager.getPdfUrl(storagePath, record.public_url);
+      }
+
+      if (pdfUrl) {
+        const extracted = await extractFullCardDataFromPdf(pdfUrl);
+        if (extracted) {
+          if (extracted.photoDataUrl && !photoDataUrl) {
+            photoDataUrl = extracted.photoDataUrl;
+            if (photoNameSpan) photoNameSpan.textContent = "Saved Photo Loaded (Click to replace)";
+          }
+          if (extracted.dob && !form.elements.dobDate.value) {
+            applyDob(extracted.dob);
+          }
+          if (extracted.gender) {
+            form.elements.gender.value = extracted.gender;
+          }
+          if (extracted.address && (!form.elements.address.value || form.elements.address.value === "Bramhanwada tal akole dist ahilyanagar")) {
+            form.elements.address.value = extracted.address;
+          }
+          if (Array.isArray(extracted.lands) && extracted.lands.length > 0) {
+            landRowsEl.innerHTML = "";
+            extracted.lands.forEach((l, idx) => {
+              landRowsEl.insertAdjacentHTML("beforeend", createLandRowHtml(idx, l));
+            });
+          } else if (extracted.address) {
+            const loc = extractLocationFromAddress(extracted.address);
+            if (loc && landRowsEl) {
+              landRowsEl.innerHTML = "";
+              landRowsEl.insertAdjacentHTML("beforeend", createLandRowHtml(0, {
+                district: loc.district || "अहिल्यानगर",
+                taluka: loc.taluka || "अकोले",
+                village: loc.village || "ब्राम्हणवाडा",
+                gatNo: "",
+                khateNo: "",
+                area: ""
+              }));
+            }
+          }
+
+          // Cache merged metadata to localStorage
+          try {
+            const fullCurrentMeta = { ...formData(), photoDataUrl };
+            if (record.id) localStorage.setItem(`farmer_card_meta_${record.id}`, JSON.stringify(fullCurrentMeta));
+            if (storagePath) localStorage.setItem(`farmer_card_meta_${storagePath}`, JSON.stringify(fullCurrentMeta));
+          } catch (e) {}
+
           render();
         }
-      } catch (e) {}
-    }
-
-    // 2b. Try companion photo file in Cloud Storage
-    if (!photoDataUrl && window.supabaseManager && window.supabaseManager.getCardPhotoBlob) {
-      try {
-        const photoBlob = await window.supabaseManager.getCardPhotoBlob(storagePath);
-        if (photoBlob) {
-          await new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = () => {
-              photoDataUrl = reader.result;
-              if (photoNameSpan) photoNameSpan.textContent = "Saved Photo Loaded (Click to replace)";
-              render();
-              resolve();
-            };
-            reader.onerror = resolve;
-            reader.readAsDataURL(photoBlob);
-          });
-        }
-      } catch (e) {}
-    }
-
-    // 2c. If still not loaded, extract directly from the PDF Page 1!
-    if (!photoDataUrl) {
-      try {
-        let pdfUrl = record.public_url || "";
-        if (window.supabaseManager && window.supabaseManager.getPdfUrl) {
-          pdfUrl = await window.supabaseManager.getPdfUrl(storagePath, record.public_url);
-        }
-
-        if (pdfUrl) {
-          const extracted = await extractPhotoFromPdf(pdfUrl);
-          if (extracted) {
-            photoDataUrl = extracted;
-            if (photoNameSpan) photoNameSpan.textContent = "Saved Photo Loaded (Click to replace)";
-
-            // Cache locally so subsequent clicks are instantaneous
-            try {
-              const currentMeta = { ...formData(), photoDataUrl: extracted };
-              if (record.id) localStorage.setItem(`farmer_card_meta_${record.id}`, JSON.stringify(currentMeta));
-              if (storagePath) localStorage.setItem(`farmer_card_meta_${storagePath}`, JSON.stringify(currentMeta));
-            } catch (e) {}
-
-            render();
-          }
-        }
-      } catch (err) {
-        console.warn("Could not extract photo from PDF:", err);
       }
+    } catch (err) {
+      console.warn("Could not extract full card details from PDF:", err);
     }
+  }
 
-    if (!photoDataUrl && photoNameSpan) {
-      photoNameSpan.textContent = "No saved photo (Upload)";
-    }
+  if (!photoDataUrl && photoNameSpan) {
+    photoNameSpan.textContent = "No saved photo (Upload)";
   }
 };
 
@@ -903,6 +1212,12 @@ async function proceedWithReplacePdf() {
     orientation: "portrait",
     unit: "mm",
     format: [152.4, 101.6]
+  });
+
+  pdf.setProperties({
+    title: data.englishName || "Farmer Card",
+    subject: JSON.stringify({ ...data, photoDataUrl: photoDataUrl || "" }),
+    author: "Farmer Card Portal"
   });
 
   const cardWidth = 85.60;
