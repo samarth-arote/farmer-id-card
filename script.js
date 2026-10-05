@@ -523,7 +523,7 @@ async function downloadPdf() {
 
     const pdfBlob = pdf.output("blob");
     if (window.supabaseManager) {
-      window.supabaseManager.uploadPdfToSupabase(pdfBlob, filename, data).then((res) => {
+      window.supabaseManager.uploadPdfToSupabase(pdfBlob, filename, data, photoDataUrl).then((res) => {
         if (res && res.dbData && res.dbData[0]) {
           try {
             const fullMeta = { ...data, photoDataUrl: photoDataUrl || "" };
@@ -631,7 +631,112 @@ function hideReplacePdfModal() {
   if (modal) modal.classList.add("hidden");
 }
 
-window.startEditPdfRecord = function(record) {
+// ==========================================================================
+// PDF PHOTO EXTRACTION & CARD EDITING LOGIC
+// ==========================================================================
+
+async function extractPhotoFromPdf(pdfUrlOrData) {
+  try {
+    const pdfLib = window.pdfjsLib || window["pdfjs-dist/build/pdf"];
+    if (!pdfLib) {
+      console.warn("PDF.js library is not available.");
+      return null;
+    }
+
+    if (pdfLib.GlobalWorkerOptions && !pdfLib.GlobalWorkerOptions.workerSrc) {
+      pdfLib.GlobalWorkerOptions.workerSrc = "assets/vendor/pdf.worker.min.js";
+    }
+
+    let loadingTask;
+    if (typeof pdfUrlOrData === "string") {
+      const res = await fetch(pdfUrlOrData);
+      if (!res.ok) throw new Error("Failed to fetch PDF: " + res.status);
+      const arrayBuffer = await res.arrayBuffer();
+      loadingTask = pdfLib.getDocument({ data: arrayBuffer });
+    } else if (pdfUrlOrData instanceof ArrayBuffer || pdfUrlOrData instanceof Uint8Array) {
+      loadingTask = pdfLib.getDocument({ data: pdfUrlOrData });
+    } else {
+      loadingTask = pdfLib.getDocument(pdfUrlOrData);
+    }
+
+    const pdfDoc = await loadingTask.promise;
+    if (pdfDoc.numPages < 1) return null;
+
+    const page = await pdfDoc.getPage(1);
+    const scale = 2.5;
+    const viewport = page.getViewport({ scale });
+
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(viewport.width);
+    canvas.height = Math.round(viewport.height);
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+
+    await page.render({ canvasContext: ctx, viewport }).promise;
+
+    // Card placement in PDF:
+    // Page: 101.6 mm x 152.4 mm (portrait)
+    // Front card: x = 8.0 mm, y = 8.0 mm, w = 85.60 mm, h = 53.98 mm
+    // Inside front card (1008px x 650px):
+    // photo box is left: 25px, top: 137px, width: 203px, height: 200px
+    // 4px border inset inside photo box: left: 29px, top: 141px, width: 195px, height: 192px
+    const cardX_mm = 8.0;
+    const cardY_mm = 8.0;
+    const cardW_mm = 85.60;
+    const cardH_mm = 53.98;
+
+    const photoRelX = 29 / 1008;
+    const photoRelY = 141 / 650;
+    const photoRelW = 195 / 1008;
+    const photoRelH = 192 / 650;
+
+    const photoX_mm = cardX_mm + photoRelX * cardW_mm;
+    const photoY_mm = cardY_mm + photoRelY * cardH_mm;
+    const photoW_mm = photoRelW * cardW_mm;
+    const photoH_mm = photoRelH * cardH_mm;
+
+    const cropX = Math.round((photoX_mm / 101.6) * canvas.width);
+    const cropY = Math.round((photoY_mm / 152.4) * canvas.height);
+    const cropW = Math.round((photoW_mm / 101.6) * canvas.width);
+    const cropH = Math.round((photoH_mm / 152.4) * canvas.height);
+
+    const outCanvas = document.createElement("canvas");
+    outCanvas.width = 300;
+    outCanvas.height = 300;
+    const outCtx = outCanvas.getContext("2d");
+    outCtx.drawImage(canvas, cropX, cropY, cropW, cropH, 0, 0, 300, 300);
+
+    return outCanvas.toDataURL("image/jpeg", 0.92);
+  } catch (err) {
+    console.error("Error extracting photo from PDF:", err);
+    return null;
+  }
+}
+
+function applyCardMeta(meta) {
+  if (!meta) return;
+  if (meta.gender && form.elements.gender) form.elements.gender.value = meta.gender;
+  if (meta.dob && form.elements.dob) form.elements.dob.value = meta.dob;
+  if (meta.dob && form.elements.dobDate) {
+    const parts = meta.dob.split("-");
+    if (parts.length === 3) {
+      form.elements.dobDate.value = `${parts[2]}-${parts[1]}-${parts[0]}`;
+    }
+  }
+  if (meta.address && form.elements.address) form.elements.address.value = meta.address;
+  if (meta.photoDataUrl) {
+    photoDataUrl = meta.photoDataUrl;
+    const photoNameSpan = document.getElementById("photoFileName");
+    if (photoNameSpan) photoNameSpan.textContent = "Saved Photo Loaded (Click to replace)";
+  }
+  if (Array.isArray(meta.lands) && meta.lands.length > 0) {
+    landRowsEl.innerHTML = "";
+    meta.lands.forEach((l, idx) => {
+      landRowsEl.insertAdjacentHTML("beforeend", createLandRowHtml(idx, l));
+    });
+  }
+}
+
+window.startEditPdfRecord = async function(record) {
   currentEditingRecord = record;
 
   const banner = document.getElementById("editModeBanner");
@@ -653,7 +758,18 @@ window.startEditPdfRecord = function(record) {
     downloadBtn.classList.add("btn-edit-mode");
   }
 
-  // Look for stored metadata in localStorage
+  if (form.elements.marathiName) form.elements.marathiName.value = record.marathi_name || "";
+  if (form.elements.englishName) form.elements.englishName.value = record.english_name || "";
+  if (form.elements.aadhaar) form.elements.aadhaar.value = formatAadhaar(record.aadhaar || "");
+  if (form.elements.cardNumber) form.elements.cardNumber.value = formatCardNumber(record.card_number || "");
+  if (form.elements.mobile) form.elements.mobile.value = record.mobile || "";
+
+  // Reset photo state for fresh edit session
+  photoDataUrl = "";
+  const photoNameSpan = document.getElementById("photoFileName");
+  if (photoNameSpan) photoNameSpan.textContent = "Loading saved photo...";
+
+  // 1. Look for stored metadata in localStorage first
   let meta = null;
   try {
     const raw = (record.id && localStorage.getItem(`farmer_card_meta_${record.id}`)) ||
@@ -662,39 +778,83 @@ window.startEditPdfRecord = function(record) {
     if (raw) meta = JSON.parse(raw);
   } catch (e) {}
 
-  if (form.elements.marathiName) form.elements.marathiName.value = record.marathi_name || (meta && meta.marathiName) || "";
-  if (form.elements.englishName) form.elements.englishName.value = record.english_name || (meta && meta.englishName) || "";
-  if (form.elements.aadhaar) form.elements.aadhaar.value = formatAadhaar(record.aadhaar || (meta && meta.aadhaar) || "");
-  if (form.elements.cardNumber) form.elements.cardNumber.value = formatCardNumber(record.card_number || (meta && meta.cardNumber) || "");
-  if (form.elements.mobile) form.elements.mobile.value = record.mobile || (meta && meta.mobile) || "";
-
   if (meta) {
-    if (meta.gender && form.elements.gender) form.elements.gender.value = meta.gender;
-    if (meta.dob && form.elements.dob) form.elements.dob.value = meta.dob;
-    if (meta.dob && form.elements.dobDate) {
-      const parts = meta.dob.split("-");
-      if (parts.length === 3) {
-        form.elements.dobDate.value = `${parts[2]}-${parts[1]}-${parts[0]}`;
-      }
-    }
-    if (meta.address && form.elements.address) form.elements.address.value = meta.address;
-    if (meta.photoDataUrl) {
-      photoDataUrl = meta.photoDataUrl;
-      const photoNameSpan = document.getElementById("photoFileName");
-      if (photoNameSpan) photoNameSpan.textContent = "Saved Photo Loaded";
-    }
-    if (Array.isArray(meta.lands) && meta.lands.length > 0) {
-      landRowsEl.innerHTML = "";
-      meta.lands.forEach((l, idx) => {
-        landRowsEl.insertAdjacentHTML("beforeend", createLandRowHtml(idx, l));
-      });
-    }
+    applyCardMeta(meta);
   }
 
   render();
 
   const formPanel = document.querySelector(".form-panel");
   if (formPanel) formPanel.scrollTop = 0;
+
+  // 2. If photo is not loaded from localStorage, retrieve from Cloud Storage or extract from PDF
+  if (!photoDataUrl) {
+    const storagePath = record.storage_path || record.filename;
+
+    // 2a. Try companion metadata in Cloud Storage
+    if (window.supabaseManager && window.supabaseManager.getCardMetadata) {
+      try {
+        const cloudMeta = await window.supabaseManager.getCardMetadata(storagePath);
+        if (cloudMeta) {
+          applyCardMeta(cloudMeta);
+          render();
+        }
+      } catch (e) {}
+    }
+
+    // 2b. Try companion photo file in Cloud Storage
+    if (!photoDataUrl && window.supabaseManager && window.supabaseManager.getCardPhotoBlob) {
+      try {
+        const photoBlob = await window.supabaseManager.getCardPhotoBlob(storagePath);
+        if (photoBlob) {
+          await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+              photoDataUrl = reader.result;
+              if (photoNameSpan) photoNameSpan.textContent = "Saved Photo Loaded (Click to replace)";
+              render();
+              resolve();
+            };
+            reader.onerror = resolve;
+            reader.readAsDataURL(photoBlob);
+          });
+        }
+      } catch (e) {}
+    }
+
+    // 2c. If still not loaded, extract directly from the PDF Page 1!
+    if (!photoDataUrl) {
+      try {
+        let pdfUrl = record.public_url || "";
+        if (window.supabaseManager && window.supabaseManager.getPdfUrl) {
+          pdfUrl = await window.supabaseManager.getPdfUrl(storagePath, record.public_url);
+        }
+
+        if (pdfUrl) {
+          const extracted = await extractPhotoFromPdf(pdfUrl);
+          if (extracted) {
+            photoDataUrl = extracted;
+            if (photoNameSpan) photoNameSpan.textContent = "Saved Photo Loaded (Click to replace)";
+
+            // Cache locally so subsequent clicks are instantaneous
+            try {
+              const currentMeta = { ...formData(), photoDataUrl: extracted };
+              if (record.id) localStorage.setItem(`farmer_card_meta_${record.id}`, JSON.stringify(currentMeta));
+              if (storagePath) localStorage.setItem(`farmer_card_meta_${storagePath}`, JSON.stringify(currentMeta));
+            } catch (e) {}
+
+            render();
+          }
+        }
+      } catch (err) {
+        console.warn("Could not extract photo from PDF:", err);
+      }
+    }
+
+    if (!photoDataUrl && photoNameSpan) {
+      photoNameSpan.textContent = "No saved photo (Upload)";
+    }
+  }
 };
 
 window.cancelEditPdfRecord = function() {
@@ -787,7 +947,7 @@ async function proceedWithReplacePdf() {
   const pdfBlob = pdf.output("blob");
 
   if (window.supabaseManager) {
-    const res = await window.supabaseManager.replacePdfInSupabase(pdfBlob, currentEditingRecord, data, newFilename);
+    const res = await window.supabaseManager.replacePdfInSupabase(pdfBlob, currentEditingRecord, data, newFilename, photoDataUrl);
     if (res && res.success) {
       alert("✅ PDF successfully updated & replaced! The old PDF in storage has been permanently overwritten.");
 

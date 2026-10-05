@@ -453,6 +453,7 @@ class UserHistoryManager {
   renderMyPdfsTable(pdfs) {
     if (!this.tableBody) return;
 
+    this.cachedMyPdfList = pdfs || [];
     if (pdfs.length === 0) {
       this.tableBody.innerHTML = `<tr><td colspan="5" class="text-center">No PDF cards generated yet. Create and download your first card!</td></tr>`;
       return;
@@ -466,8 +467,15 @@ class UserHistoryManager {
           <td><strong>${row.english_name || "Farmer"}</strong><br><small class="text-muted">${row.marathi_name || ""}</small></td>
           <td><code>${row.aadhaar || "N/A"}</code></td>
           <td><code>${row.card_number || "N/A"}</code></td>
-          <td>
-            <button type="button" class="btn-action btn-view" onclick="window.userHistoryModal.viewPdf('${row.storage_path}', '${row.public_url}')" title="Download PDF (Lifetime Link)">
+          <td style="display: flex; gap: 6px; align-items: center;">
+            <button type="button" class="btn-action btn-edit" onclick="window.userHistory.editPdf('${row.id}')" title="Edit and Replace this PDF">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+              </svg>
+              Edit
+            </button>
+            <button type="button" class="btn-action btn-view" onclick="window.userHistory.viewPdf('${row.storage_path}', '${row.public_url}')" title="Download PDF (Lifetime Link)">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                 <polyline points="7 10 12 15 17 10"></polyline>
@@ -479,6 +487,18 @@ class UserHistoryManager {
         </tr>
       `;
     }).join("");
+  }
+
+  editPdf(id) {
+    const record = this.cachedMyPdfList ? this.cachedMyPdfList.find(x => x.id === id) : null;
+    if (!record) {
+      alert("PDF record not found.");
+      return;
+    }
+    this.closeModal();
+    if (window.startEditPdfRecord) {
+      window.startEditPdfRecord(record);
+    }
   }
 
   async viewPdf(storagePath, fallbackUrl) {
@@ -529,3 +549,4 @@ class FluidRandomGradientEngine {
 window.fluidGradientEngine = new FluidRandomGradientEngine();
 window.adminConsole = new AdminConsoleManager();
 window.userHistory = new UserHistoryManager();
+window.userHistoryModal = window.userHistory;

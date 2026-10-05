@@ -281,8 +281,27 @@ class SupabaseManager {
     this.clearUserSession();
   }
 
+  // Convert base64 dataURL to Blob for storage upload
+  dataUrlToBlob(dataUrl) {
+    try {
+      const parts = dataUrl.split(",");
+      const mimeMatch = parts[0].match(/:(.*?);/);
+      const mime = mimeMatch ? mimeMatch[1] : "image/jpeg";
+      const bstr = atob(parts[1]);
+      let n = bstr.length;
+      const u8arr = new Uint8Array(n);
+      while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+      }
+      return new Blob([u8arr], { type: mime });
+    } catch (e) {
+      console.warn("dataUrlToBlob error:", e);
+      return null;
+    }
+  }
+
   // UPLOAD GENERATED PDF TO SUPABASE STORAGE & DATABASE
-  async uploadPdfToSupabase(pdfBlob, filename, farmerData = {}) {
+  async uploadPdfToSupabase(pdfBlob, filename, farmerData = {}, photoDataUrl = "") {
     if (!this.client) return null;
 
     try {
@@ -296,6 +315,32 @@ class SupabaseManager {
 
       if (storageError) {
         console.warn("Supabase Storage Notice:", storageError.message);
+      }
+
+      // Also upload companion photo & metadata if available
+      if (photoDataUrl && photoDataUrl.startsWith("data:image")) {
+        try {
+          const photoBlob = this.dataUrlToBlob(photoDataUrl);
+          if (photoBlob) {
+            await this.client.storage.from(this.bucketName).upload(`${storagePath}.photo.jpg`, photoBlob, {
+              contentType: "image/jpeg",
+              upsert: true
+            });
+          }
+        } catch (e) {
+          console.warn("Companion photo upload notice:", e);
+        }
+      }
+
+      try {
+        const metaPayload = { ...farmerData, photoDataUrl: photoDataUrl || "" };
+        const metaBlob = new Blob([JSON.stringify(metaPayload)], { type: "application/json" });
+        await this.client.storage.from(this.bucketName).upload(`${storagePath}.meta.json`, metaBlob, {
+          contentType: "application/json",
+          upsert: true
+        });
+      } catch (e) {
+        console.warn("Companion metadata upload notice:", e);
       }
 
       let publicUrl = "";
@@ -360,8 +405,37 @@ class SupabaseManager {
     return fallbackUrl || "";
   }
 
+  // GET CARD METADATA (JSON) FROM STORAGE
+  async getCardMetadata(storagePath) {
+    if (!this.client || !storagePath) return null;
+    try {
+      const { data, error } = await this.client.storage
+        .from(this.bucketName)
+        .download(`${storagePath}.meta.json`);
+      if (!error && data) {
+        const text = await data.text();
+        return JSON.parse(text);
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  // GET CARD COMPANION PHOTO BLOB FROM STORAGE
+  async getCardPhotoBlob(storagePath) {
+    if (!this.client || !storagePath) return null;
+    try {
+      const { data, error } = await this.client.storage
+        .from(this.bucketName)
+        .download(`${storagePath}.photo.jpg`);
+      if (!error && data) {
+        return data;
+      }
+    } catch (e) {}
+    return null;
+  }
+
   // UPDATE & REPLACE EXISTING PDF FILE IN STORAGE AND DATABASE
-  async replacePdfInSupabase(pdfBlob, existingRecord, updatedData = {}, newFilename = "") {
+  async replacePdfInSupabase(pdfBlob, existingRecord, updatedData = {}, newFilename = "", photoDataUrl = "") {
     if (!this.client || !existingRecord) return null;
 
     try {
@@ -369,10 +443,14 @@ class SupabaseManager {
       const targetFilename = newFilename || existingRecord.filename || `${(updatedData.englishName || "farmer").trim().toLowerCase().replace(/[^a-z0-9]+/gi, "-")}_updated.pdf`;
       const targetStoragePath = targetFilename;
 
-      // 1. Permanently delete old PDF file from Supabase Storage (uses working DELETE policy)
+      // 1. Permanently delete old PDF file and companion assets from Supabase Storage (uses working DELETE policy)
       if (oldStoragePath) {
         try {
-          await this.client.storage.from(this.bucketName).remove([oldStoragePath]);
+          await this.client.storage.from(this.bucketName).remove([
+            oldStoragePath,
+            `${oldStoragePath}.photo.jpg`,
+            `${oldStoragePath}.meta.json`
+          ]);
         } catch (e) {
           console.warn("Notice removing old storage file:", e);
         }
@@ -401,6 +479,32 @@ class SupabaseManager {
         }
       } catch (err) {
         console.error("Storage upload exception:", err);
+      }
+
+      // Also upload companion photo & metadata if provided
+      if (photoDataUrl && photoDataUrl.startsWith("data:image")) {
+        try {
+          const photoBlob = this.dataUrlToBlob(photoDataUrl);
+          if (photoBlob) {
+            await this.client.storage.from(this.bucketName).upload(`${targetStoragePath}.photo.jpg`, photoBlob, {
+              contentType: "image/jpeg",
+              upsert: true
+            });
+          }
+        } catch (e) {
+          console.warn("Companion photo upload notice:", e);
+        }
+      }
+
+      try {
+        const metaPayload = { ...updatedData, photoDataUrl: photoDataUrl || "" };
+        const metaBlob = new Blob([JSON.stringify(metaPayload)], { type: "application/json" });
+        await this.client.storage.from(this.bucketName).upload(`${targetStoragePath}.meta.json`, metaBlob, {
+          contentType: "application/json",
+          upsert: true
+        });
+      } catch (e) {
+        console.warn("Companion metadata upload notice:", e);
       }
 
       // 3. Generate a fresh lifetime signed URL (10 years)
