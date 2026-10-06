@@ -298,12 +298,22 @@ class SupabaseManager {
         console.warn("Supabase Storage Notice:", storageError.message);
       }
 
+      const TEN_PLUS_YEARS_SECONDS = 315576000; // 10+ Years (315,576,000 seconds)
       let publicUrl = "";
       try {
-        const { data: signedData } = await this.client.storage.from(this.bucketName).createSignedUrl(storagePath, 3600);
+        const { data: signedData } = await this.client.storage
+          .from(this.bucketName)
+          .createSignedUrl(storagePath, TEN_PLUS_YEARS_SECONDS);
         publicUrl = signedData ? signedData.signedUrl : "";
       } catch (e) {
         console.warn("Signed URL error:", e);
+      }
+
+      if (!publicUrl) {
+        try {
+          const { data: pubData } = this.client.storage.from(this.bucketName).getPublicUrl(storagePath);
+          if (pubData && pubData.publicUrl) publicUrl = pubData.publicUrl;
+        } catch (e) {}
       }
 
       const rowData = {
@@ -335,7 +345,32 @@ class SupabaseManager {
     }
   }
 
-  // ADMIN API: FETCH ALL GENERATED PDFS
+  // GET OR REFRESH 10+ YEARS SIGNED VIEW URL FOR A SPECIFIC PDF
+  async getPdfViewUrl(storagePath, fallbackUrl = "") {
+    if (!this.client || !storagePath) return fallbackUrl;
+    const TEN_PLUS_YEARS_SECONDS = 315576000; // 10+ Years
+
+    try {
+      const { data: signedData, error } = await this.client.storage
+        .from(this.bucketName)
+        .createSignedUrl(storagePath, TEN_PLUS_YEARS_SECONDS);
+
+      if (signedData && signedData.signedUrl) {
+        return signedData.signedUrl;
+      }
+    } catch (err) {
+      console.warn("getPdfViewUrl error:", err);
+    }
+
+    try {
+      const { data: pubData } = this.client.storage.from(this.bucketName).getPublicUrl(storagePath);
+      if (pubData && pubData.publicUrl) return pubData.publicUrl;
+    } catch (e) {}
+
+    return fallbackUrl;
+  }
+
+  // ADMIN API: FETCH ALL GENERATED PDFS (AUTO-RESOLVES 10+ YEARS VALID VIEW URLS)
   async fetchPdfHistory() {
     if (!this.client) return [];
     try {
@@ -344,14 +379,45 @@ class SupabaseManager {
         .select("*")
         .order("created_at", { ascending: false });
 
-      if (error) return [];
-      return data || [];
+      if (error || !data) return [];
+
+      // Auto-ensure 10+ years active signed URLs for all PDFs in Superadmin console
+      const TEN_PLUS_YEARS_SECONDS = 315576000; // 10+ Years
+      const paths = data.map((r) => r.storage_path || r.filename).filter(Boolean);
+
+      if (paths.length > 0) {
+        try {
+          const { data: signedList } = await this.client.storage
+            .from(this.bucketName)
+            .createSignedUrls(paths, TEN_PLUS_YEARS_SECONDS);
+
+          if (signedList && Array.isArray(signedList)) {
+            const urlMap = {};
+            signedList.forEach((item) => {
+              if (item && item.signedUrl) {
+                urlMap[item.path] = item.signedUrl;
+              }
+            });
+
+            data.forEach((r) => {
+              const path = r.storage_path || r.filename;
+              if (urlMap[path]) {
+                r.public_url = urlMap[path];
+              }
+            });
+          }
+        } catch (signErr) {
+          console.warn("Batch signed URLs notice:", signErr);
+        }
+      }
+
+      return data;
     } catch (e) {
       return [];
     }
   }
 
-  // REGULAR USER API: FETCH ONLY MY GENERATED PDFS
+  // REGULAR USER API: FETCH ONLY MY GENERATED PDFS (AUTO-RESOLVES 10+ YEARS VALID VIEW URLS)
   async fetchMyPdfHistory() {
     if (!this.client || !this.currentUser) return [];
     try {
@@ -361,8 +427,38 @@ class SupabaseManager {
         .or(`user_id.eq.${this.currentUser.id},user_email.eq.${this.currentUser.email}`)
         .order("created_at", { ascending: false });
 
-      if (error) return [];
-      return data || [];
+      if (error || !data) return [];
+
+      const TEN_PLUS_YEARS_SECONDS = 315576000; // 10+ Years
+      const paths = data.map((r) => r.storage_path || r.filename).filter(Boolean);
+
+      if (paths.length > 0) {
+        try {
+          const { data: signedList } = await this.client.storage
+            .from(this.bucketName)
+            .createSignedUrls(paths, TEN_PLUS_YEARS_SECONDS);
+
+          if (signedList && Array.isArray(signedList)) {
+            const urlMap = {};
+            signedList.forEach((item) => {
+              if (item && item.signedUrl) {
+                urlMap[item.path] = item.signedUrl;
+              }
+            });
+
+            data.forEach((r) => {
+              const path = r.storage_path || r.filename;
+              if (urlMap[path]) {
+                r.public_url = urlMap[path];
+              }
+            });
+          }
+        } catch (signErr) {
+          console.warn("Batch signed URLs notice:", signErr);
+        }
+      }
+
+      return data;
     } catch (e) {
       return [];
     }

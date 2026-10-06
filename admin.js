@@ -157,8 +157,8 @@ class AdminConsoleManager {
           <td><code>${row.card_number || "N/A"}</code></td>
           <td><span class="user-pill">${row.user_email || "Admin"}</span></td>
           <td class="action-cell">
-            ${row.public_url ? `
-              <a href="${row.public_url}" target="_blank" class="btn-action btn-view" title="View PDF">
+            ${(row.public_url || row.storage_path) ? `
+              <a href="${row.public_url || '#'}" target="_blank" class="btn-action btn-view" title="View PDF (10+ Years Validity)" onclick="window.adminConsole.viewPdf(event, '${row.storage_path || row.filename}', '${row.public_url || ''}')">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
                   <circle cx="12" cy="12" r="3"></circle>
@@ -281,6 +281,23 @@ class AdminConsoleManager {
     });
 
     this.renderPdfsTable(filtered);
+  }
+
+  async viewPdf(event, storagePath, currentUrl) {
+    if (!storagePath && !currentUrl) return;
+    if (event) event.preventDefault();
+
+    let targetUrl = currentUrl;
+    if (window.supabaseManager) {
+      const freshUrl = await window.supabaseManager.getPdfViewUrl(storagePath, currentUrl);
+      if (freshUrl) targetUrl = freshUrl;
+    }
+
+    if (targetUrl && targetUrl !== "#") {
+      window.open(targetUrl, "_blank");
+    } else {
+      alert("Unable to open PDF. File not found in storage.");
+    }
   }
 
   async deletePdf(id, storagePath) {
@@ -437,8 +454,8 @@ class UserHistoryManager {
           <td><code>${row.aadhaar || "N/A"}</code></td>
           <td><code>${row.card_number || "N/A"}</code></td>
           <td>
-            ${row.public_url ? `
-              <a href="${row.public_url}" target="_blank" class="btn-action btn-view">
+            ${(row.public_url || row.storage_path) ? `
+              <a href="${row.public_url || '#'}" target="_blank" class="btn-action btn-view" title="Download / View PDF (10+ Years Validity)" onclick="window.userHistory.viewPdf(event, '${row.storage_path || row.filename}', '${row.public_url || ''}')">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                   <polyline points="7 10 12 15 17 10"></polyline>
@@ -451,6 +468,23 @@ class UserHistoryManager {
         </tr>
       `;
     }).join("");
+  }
+
+  async viewPdf(event, storagePath, currentUrl) {
+    if (!storagePath && !currentUrl) return;
+    if (event) event.preventDefault();
+
+    let targetUrl = currentUrl;
+    if (window.supabaseManager) {
+      const freshUrl = await window.supabaseManager.getPdfViewUrl(storagePath, currentUrl);
+      if (freshUrl) targetUrl = freshUrl;
+    }
+
+    if (targetUrl && targetUrl !== "#") {
+      window.open(targetUrl, "_blank");
+    } else {
+      alert("Unable to open PDF. File not found in storage.");
+    }
   }
 }
 
