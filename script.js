@@ -289,23 +289,7 @@ function formData() {
 }
 
 function qrPayload(data) {
-  let landsStr = "";
-  if (Array.isArray(data.lands) && data.lands.length > 0) {
-    landsStr = data.lands.map(l => `${l.district || ""}|${l.taluka || ""}|${l.village || ""}|${l.gatNo || ""}|${l.khateNo || ""}|${l.area || ""}`).join(";");
-  }
-  const lines = [
-    `Name: ${data.englishName || ""}`,
-    `DOB: ${data.dob || ""}`,
-    `Gender: ${data.gender || "Male"}`,
-    `Mobile: ${data.mobile || ""}`,
-    `Aadhaar: ${data.aadhaar || ""}`,
-    `Card: ${data.cardNumber || ""}`,
-    `Address: ${data.address || ""}`
-  ];
-  if (landsStr) {
-    lines.push(`Lands: ${landsStr}`);
-  }
-  return lines.join("\n");
+  return [`Name: ${data.englishName}`, `DOB: ${data.dob}`, `Gender: ${data.gender}`, `Mobile: ${data.mobile}`, `Aadhaar: ${data.aadhaar}`, `Card: ${data.cardNumber}`, `Address: ${data.address}`].join("\n");
 }
 
 function formatDobDDMMYYYY(value) {
@@ -393,13 +377,8 @@ function makeCard(template, data) {
       cells.forEach((val) => {
         const cell = document.createElement("div");
         cell.className = "land-cell";
-        const valStr = (val ?? "").toString();
-        let effFont = font;
-        if (valStr.length > 9) effFont = Math.min(effFont, 16.5);
-        if (valStr.length > 12) effFont = Math.min(effFont, 14.5);
-        cell.style.cssText = `font-size:${effFont}px; margin-top:0;`;
-        cell.textContent = valStr;
-        cell.title = valStr;
+        cell.style.cssText = cellStyle;
+        cell.textContent = (val ?? "").toString();
         row.appendChild(cell);
       });
 
@@ -500,12 +479,6 @@ async function downloadPdf() {
         format: [152.4, 101.6]
     });
 
-    pdf.setProperties({
-        title: data.englishName || "Farmer Card",
-        subject: JSON.stringify({ ...data, photoDataUrl: photoDataUrl || "" }),
-        author: "Farmer Card Portal"
-    });
-
     const cardWidth = 85.60;
     const cardHeight = 53.98;
 
@@ -549,15 +522,7 @@ async function downloadPdf() {
 
     const pdfBlob = pdf.output("blob");
     if (window.supabaseManager) {
-      window.supabaseManager.uploadPdfToSupabase(pdfBlob, filename, data, photoDataUrl).then((res) => {
-        if (res && res.dbData && res.dbData[0]) {
-          try {
-            const fullMeta = { ...data, photoDataUrl: photoDataUrl || "" };
-            localStorage.setItem(`farmer_card_meta_${res.dbData[0].id}`, JSON.stringify(fullMeta));
-            localStorage.setItem(`farmer_card_meta_${filename}`, JSON.stringify(fullMeta));
-          } catch (e) {}
-        }
-      });
+      window.supabaseManager.uploadPdfToSupabase(pdfBlob, filename, data);
     }
 
     if (window.driveManager) {
@@ -637,22 +602,6 @@ resetBtn.addEventListener("click", () => {
 
 form.addEventListener("submit", (e) => e.preventDefault());
 
-// ==========================================================================
-// WINDOW BRIDGES FOR EXTERNAL MODULES (edit-manager.js)
-// ==========================================================================
-
-window.getPhotoDataUrl = () => photoDataUrl;
-window.setPhotoDataUrl = (val) => { photoDataUrl = val; };
-window.renderCard = render;
-window.getFormData = formData;
-window.createLandRowHtml = createLandRowHtml;
-window.cardCanvas = cardCanvas;
-window.makeCard = makeCard;
-window.formatAadhaar = formatAadhaar;
-window.formatCardNumber = formatCardNumber;
-window.getFormattedTimestamp = getFormattedTimestamp;
-window.initLandRows = initLandRows;
-
 downloadBtn.addEventListener("click", async () => {
   const aadhaarOk = isValidAadhaar(form.elements.aadhaar.value);
   if (!aadhaarOk) {
@@ -663,11 +612,6 @@ downloadBtn.addEventListener("click", async () => {
   const cardOk = isValidCardNumber(form.elements.cardNumber.value);
   if (!cardOk) {
     alert("Card Number must contain exactly 11 digits (format: 4 digits + space + 4 digits + space + 3 digits).");
-    return;
-  }
-
-  if (window.editManager && window.editManager.isEditing()) {
-    window.editManager.showReplaceModal();
     return;
   }
 
@@ -762,45 +706,6 @@ function initAuthAndAdminUI() {
   }
 }
 
-// EYE COMFORT LIGHT MODE MANAGER
-function initEyeComfortMode() {
-  const cornerBtn = document.getElementById("btnEyeComfortCorner");
-  const headerBtn = document.getElementById("btnEyeComfortHeader");
-
-  const updateButtons = (active) => {
-    if (cornerBtn) {
-      cornerBtn.innerHTML = active
-        ? `<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.389 5.389 0 0 1-4.4 2.26 5.403 5.403 0 0 1-3.14-9.8c-.44-.06-.9-.1-1.36-.1z"/></svg> <span>Eye Comfort: ON 🌿</span>`
-        : `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg> <span>Eye Comfort Mode</span>`;
-    }
-    if (headerBtn) {
-      headerBtn.classList.toggle("active", active);
-      const text = headerBtn.querySelector(".comfort-text");
-      if (text) text.textContent = active ? "Comfort: ON" : "Eye Comfort";
-    }
-  };
-
-  const toggle = () => {
-    const isNowComfort = document.body.classList.toggle("eye-comfort");
-    localStorage.setItem("farmer_eye_comfort", isNowComfort ? "true" : "false");
-    updateButtons(isNowComfort);
-  };
-
-  // Restore saved state
-  try {
-    const saved = localStorage.getItem("farmer_eye_comfort");
-    if (saved === "true") {
-      document.body.classList.add("eye-comfort");
-      updateButtons(true);
-    } else {
-      updateButtons(false);
-    }
-  } catch (e) {}
-
-  if (cornerBtn) cornerBtn.addEventListener("click", toggle);
-  if (headerBtn) headerBtn.addEventListener("click", toggle);
-}
-
 // Initial setup
 initLandRows();
 render();
@@ -808,4 +713,3 @@ initViewModeControls();
 init3DDragRotator();
 setTimeout(updateCardScale, 100);
 initAuthAndAdminUI();
-initEyeComfortMode();

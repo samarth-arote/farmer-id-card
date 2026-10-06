@@ -157,20 +157,15 @@ class AdminConsoleManager {
           <td><code>${row.card_number || "N/A"}</code></td>
           <td><span class="user-pill">${row.user_email || "Admin"}</span></td>
           <td class="action-cell">
-            <button type="button" class="btn-action btn-view" onclick="window.adminConsole.viewPdf('${row.storage_path}', '${row.public_url}')" title="View PDF (Lifetime Link)">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                <circle cx="12" cy="12" r="3"></circle>
-              </svg>
-              View
-            </button>
-            <button type="button" class="btn-action btn-edit" onclick="window.adminConsole.editPdf('${row.id}')" title="Edit Farmer Card Details">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-              </svg>
-              Edit
-            </button>
+            ${row.public_url ? `
+              <a href="${row.public_url}" target="_blank" class="btn-action btn-view" title="View PDF">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+                View
+              </a>
+            ` : ""}
             <button type="button" class="btn-action btn-delete" onclick="window.adminConsole.deletePdf('${row.id}', '${row.storage_path}')" title="Delete PDF">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="3 6 5 6 21 6"></polyline>
@@ -302,31 +297,6 @@ class AdminConsoleManager {
     }
   }
 
-  async viewPdf(storagePath, fallbackUrl) {
-    if (!window.supabaseManager) {
-      if (fallbackUrl) window.open(fallbackUrl, "_blank");
-      return;
-    }
-    const url = await window.supabaseManager.getPdfUrl(storagePath, fallbackUrl);
-    if (url) {
-      window.open(url, "_blank");
-    } else {
-      alert("Could not load PDF. The file may no longer exist in storage.");
-    }
-  }
-
-  editPdf(id) {
-    const record = this.cachedPdfList.find(x => x.id === id);
-    if (!record) {
-      alert("PDF record not found.");
-      return;
-    }
-    this.closeConsole();
-    if (window.startEditPdfRecord) {
-      window.startEditPdfRecord(record);
-    }
-  }
-
   async toggleRole(userId, userEmail, newRole) {
     if (userEmail.toLowerCase().trim() === this.superAdminEmail.toLowerCase().trim()) {
       alert("Action Denied: Primary Super Admin account role cannot be altered!");
@@ -453,7 +423,6 @@ class UserHistoryManager {
   renderMyPdfsTable(pdfs) {
     if (!this.tableBody) return;
 
-    this.cachedMyPdfList = pdfs || [];
     if (pdfs.length === 0) {
       this.tableBody.innerHTML = `<tr><td colspan="5" class="text-center">No PDF cards generated yet. Create and download your first card!</td></tr>`;
       return;
@@ -467,51 +436,21 @@ class UserHistoryManager {
           <td><strong>${row.english_name || "Farmer"}</strong><br><small class="text-muted">${row.marathi_name || ""}</small></td>
           <td><code>${row.aadhaar || "N/A"}</code></td>
           <td><code>${row.card_number || "N/A"}</code></td>
-          <td style="display: flex; gap: 6px; align-items: center;">
-            <button type="button" class="btn-action btn-edit" onclick="window.userHistory.editPdf('${row.id}')" title="Edit and Replace this PDF">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-              </svg>
-              Edit
-            </button>
-            <button type="button" class="btn-action btn-view" onclick="window.userHistory.viewPdf('${row.storage_path}', '${row.public_url}')" title="Download PDF (Lifetime Link)">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                <polyline points="7 10 12 15 17 10"></polyline>
-                <line x1="12" y1="15" x2="12" y2="3"></line>
-              </svg>
-              Download PDF
-            </button>
+          <td>
+            ${row.public_url ? `
+              <a href="${row.public_url}" target="_blank" class="btn-action btn-view">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="7 10 12 15 17 10"></polyline>
+                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                Download PDF
+              </a>
+            ` : `<span class="text-muted">Saved</span>`}
           </td>
         </tr>
       `;
     }).join("");
-  }
-
-  editPdf(id) {
-    const record = this.cachedMyPdfList ? this.cachedMyPdfList.find(x => x.id === id) : null;
-    if (!record) {
-      alert("PDF record not found.");
-      return;
-    }
-    this.closeModal();
-    if (window.startEditPdfRecord) {
-      window.startEditPdfRecord(record);
-    }
-  }
-
-  async viewPdf(storagePath, fallbackUrl) {
-    if (!window.supabaseManager) {
-      if (fallbackUrl) window.open(fallbackUrl, "_blank");
-      return;
-    }
-    const url = await window.supabaseManager.getPdfUrl(storagePath, fallbackUrl);
-    if (url) {
-      window.open(url, "_blank");
-    } else {
-      alert("Could not load PDF URL.");
-    }
   }
 }
 
@@ -549,4 +488,3 @@ class FluidRandomGradientEngine {
 window.fluidGradientEngine = new FluidRandomGradientEngine();
 window.adminConsole = new AdminConsoleManager();
 window.userHistory = new UserHistoryManager();
-window.userHistoryModal = window.userHistory;
