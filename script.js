@@ -521,6 +521,7 @@ async function downloadPdf() {
     pdf.save(filename);
 
     const pdfBlob = pdf.output("blob");
+    data.photoDataUrl = photoDataUrl || "";
     if (window.supabaseManager) {
       window.supabaseManager.uploadPdfToSupabase(pdfBlob, filename, data);
     }
@@ -594,6 +595,9 @@ if (form.elements.dobDate) {
 }
 
 resetBtn.addEventListener("click", () => {
+  if (currentEditingCardRecord) {
+    window.cancelSuperAdminEditCard();
+  }
   form.reset();
   photoDataUrl = "";
   initLandRows();
@@ -601,6 +605,203 @@ resetBtn.addEventListener("click", () => {
 });
 
 form.addEventListener("submit", (e) => e.preventDefault());
+
+let currentEditingCardRecord = null;
+
+window.startSuperAdminEditCard = function(record) {
+  currentEditingCardRecord = record;
+
+  const banner = document.getElementById("superAdminEditBanner");
+  const bannerFarmer = document.getElementById("editBannerFarmerName");
+  const bannerCardInfo = document.getElementById("editBannerCardInfo");
+
+  if (banner) banner.classList.remove("hidden");
+  if (bannerFarmer) bannerFarmer.textContent = `Editing: ${record.english_name || "Farmer"}`;
+  if (bannerCardInfo) bannerCardInfo.textContent = `Card: ${record.card_number || "N/A"} | Aadhaar: ${record.aadhaar || "N/A"}`;
+
+  if (downloadBtn) {
+    downloadBtn.innerHTML = `
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+        <polyline points="17 21 17 13 7 13 7 21"></polyline>
+        <polyline points="7 3 7 8 15 8"></polyline>
+      </svg>
+      Update & Replace PDF
+    `;
+    downloadBtn.classList.add("btn-edit-mode");
+  }
+
+  // Pre-fill ALL data including photo
+  let savedMeta = null;
+  if (record.card_data) {
+    savedMeta = (typeof record.card_data === "string") ? JSON.parse(record.card_data) : record.card_data;
+  }
+  if (!savedMeta) {
+    try {
+      const raw = (record.id && localStorage.getItem(`farmer_card_meta_${record.id}`)) ||
+                  (record.storage_path && localStorage.getItem(`farmer_card_meta_${record.storage_path}`)) ||
+                  (record.filename && localStorage.getItem(`farmer_card_meta_${record.filename}`));
+      if (raw) savedMeta = JSON.parse(raw);
+    } catch (e) {}
+  }
+  savedMeta = savedMeta || {};
+
+  if (form.elements.marathiName) form.elements.marathiName.value = record.marathi_name || savedMeta.marathiName || "";
+  if (form.elements.englishName) form.elements.englishName.value = record.english_name || savedMeta.englishName || "";
+  if (form.elements.aadhaar) form.elements.aadhaar.value = formatAadhaar(record.aadhaar || savedMeta.aadhaar || "");
+  if (form.elements.cardNumber) form.elements.cardNumber.value = formatCardNumber(record.card_number || savedMeta.cardNumber || "");
+  if (form.elements.mobile) form.elements.mobile.value = record.mobile || savedMeta.mobile || "";
+
+  if (form.elements.gender) form.elements.gender.value = savedMeta.gender || "Male";
+  if (savedMeta.dobDate && form.elements.dobDate) {
+    form.elements.dobDate.value = savedMeta.dobDate;
+  } else if (savedMeta.dob && form.elements.dobDate) {
+    const parts = savedMeta.dob.split("-");
+    if (parts.length === 3) form.elements.dobDate.value = `${parts[2]}-${parts[1]}-${parts[0]}`;
+  }
+  if (form.elements.dob) form.elements.dob.value = savedMeta.dob || (form.elements.dobDate ? formatDobDDMMYYYY(form.elements.dobDate.value) : "");
+  if (savedMeta.address && form.elements.address) form.elements.address.value = savedMeta.address;
+
+  // Restore land rows
+  if (Array.isArray(savedMeta.lands) && savedMeta.lands.length > 0) {
+    landRowsEl.innerHTML = "";
+    savedMeta.lands.forEach((l, idx) => {
+      landRowsEl.insertAdjacentHTML("beforeend", createLandRowHtml(idx, l));
+    });
+  }
+
+  // Restore photo
+  if (savedMeta.photoDataUrl) {
+    photoDataUrl = savedMeta.photoDataUrl;
+    const photoNameSpan = document.getElementById("photoFileName");
+    if (photoNameSpan) photoNameSpan.textContent = "Saved Photo Loaded ✓";
+  }
+
+  render();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+
+  setTimeout(() => {
+    alert(`✏️ Super Admin Edit Mode Activated:\n\nAll existing card details and photo for "${record.english_name || 'Farmer'}" have been pre-filled.\n\n⚠️ Notice: When you click "Update & Replace PDF", the old PDF will be deleted first, then replaced with your updated PDF.\n\nUser account access will NOT be revoked after updation.`);
+  }, 200);
+};
+
+window.cancelSuperAdminEditCard = function() {
+  currentEditingCardRecord = null;
+  const banner = document.getElementById("superAdminEditBanner");
+  if (banner) banner.classList.add("hidden");
+
+  if (downloadBtn) {
+    downloadBtn.innerHTML = `
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+        <polyline points="7 10 12 15 17 10"></polyline>
+        <line x1="12" y1="15" x2="12" y2="3"></line>
+      </svg>
+      Download PDF
+    `;
+    downloadBtn.classList.remove("btn-edit-mode");
+  }
+};
+
+async function proceedWithSuperAdminUpdatePdf() {
+  if (!currentEditingCardRecord) return;
+  if (!window.html2canvas || !window.jspdf) {
+    alert("PDF libraries are not loaded.");
+    return;
+  }
+
+  downloadBtn.disabled = true;
+  downloadBtn.textContent = "Updating & Replacing PDF...";
+
+  const targetRecord = currentEditingCardRecord;
+  const data = formData();
+  data.photoDataUrl = photoDataUrl || "";
+
+  // 1. DELETE OLD PDF FIRST (Ensure first delete old pdf)
+  if (window.supabaseManager) {
+    console.log("Super Admin: Deleting old PDF record first:", targetRecord.filename);
+    await window.supabaseManager.deletePdfRecord(targetRecord.id, targetRecord.storage_path || targetRecord.filename);
+  }
+
+  // 2. GENERATE NEW UPDATED PDF
+  printStack.innerHTML = "";
+  const front = makeCard(frontTemplate, data);
+  const back = makeCard(backTemplate, data);
+  printStack.append(front, back);
+
+  await new Promise(resolve => setTimeout(resolve, 300));
+
+  const frontCanvas = await cardCanvas(front);
+  const backCanvas = await cardCanvas(back);
+
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({
+    orientation: "portrait",
+    unit: "mm",
+    format: [152.4, 101.6]
+  });
+
+  const cardWidth = 85.60;
+  const cardHeight = 53.98;
+  const x = (101.6 - cardWidth) / 2;
+  const topMargin = 8;
+  const gap = 8;
+
+  pdf.addImage(
+    frontCanvas.toDataURL("image/jpeg", 0.90),
+    "JPEG",
+    x,
+    topMargin,
+    cardWidth,
+    cardHeight,
+    undefined,
+    "FAST"
+  );
+
+  pdf.addImage(
+    backCanvas.toDataURL("image/jpeg", 0.90),
+    "JPEG",
+    x,
+    topMargin + cardHeight + gap,
+    cardWidth,
+    cardHeight,
+    undefined,
+    "FAST"
+  );
+
+  const rawName = (data.englishName || "Farmer")
+    .trim()
+    .replace(/[^a-z0-9]+/gi, "-")
+    .replace(/^-|-$/g, "")
+    .toLowerCase();
+
+  const timestamp = getFormattedTimestamp();
+  const newFilename = `${rawName || "farmer"}_${timestamp}.pdf`;
+
+  pdf.save(newFilename);
+
+  const pdfBlob = pdf.output("blob");
+
+  // Preserve original user ownership
+  const uploadData = {
+    ...data,
+    userId: targetRecord.user_id,
+    userEmail: targetRecord.user_email
+  };
+
+  if (window.supabaseManager) {
+    const uploadRes = await window.supabaseManager.uploadPdfToSupabase(pdfBlob, newFilename, uploadData);
+    if (uploadRes) {
+      alert("✅ Card Successfully Updated!\n\nThe old PDF was deleted and replaced with the new version.\nUser account access was NOT revoked.");
+    } else {
+      alert("PDF downloaded locally. Please verify Supabase upload status.");
+    }
+  }
+
+  printStack.innerHTML = "";
+  downloadBtn.disabled = false;
+  window.cancelSuperAdminEditCard();
+}
 
 downloadBtn.addEventListener("click", async () => {
   // HARD SECURITY GATE: Verify if user account is active and approved in Supabase
@@ -620,6 +821,20 @@ downloadBtn.addEventListener("click", async () => {
   const cardOk = isValidCardNumber(form.elements.cardNumber.value);
   if (!cardOk) {
     alert("Card Number must contain exactly 11 digits (format: 4 digits + space + 4 digits + space + 3 digits).");
+    return;
+  }
+
+  if (currentEditingCardRecord) {
+    const ok = confirm(
+      `Confirm Card Update & PDF Replacement:\n\n` +
+      `1. The previous PDF file (${currentEditingCardRecord.filename}) will be permanently deleted from Supabase Storage and Database.\n` +
+      `2. The new updated PDF will be uploaded with 10+ years lifetime access.\n` +
+      `3. User account access will NOT be revoked after updation.\n\n` +
+      `Do you want to proceed?`
+    );
+    if (!ok) return;
+
+    await proceedWithSuperAdminUpdatePdf();
     return;
   }
 
@@ -796,6 +1011,13 @@ function initAuthAndAdminUI() {
   if (btnLogout) {
     btnLogout.addEventListener("click", () => {
       window.supabaseManager.signOut();
+    });
+  }
+
+  const btnCancelSuperAdminEdit = document.getElementById("btnCancelSuperAdminEdit");
+  if (btnCancelSuperAdminEdit) {
+    btnCancelSuperAdminEdit.addEventListener("click", () => {
+      window.cancelSuperAdminEditCard();
     });
   }
 }

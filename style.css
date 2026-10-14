@@ -671,6 +671,125 @@ button, input, select, textarea {
   color: #771d1d;
 }
 
+.btn-edit-card {
+  background: #fef3c7;
+  color: #b45309;
+  border-color: #fde68a;
+}
+
+.btn-edit-card:hover {
+  background: #fde68a;
+  color: #92400e;
+  border-color: #f59e0b;
+  transform: translateY(-1px);
+}
+
+.btn.btn-edit-mode {
+  background: linear-gradient(135deg, #d97706, #b45309) !important;
+  color: #ffffff !important;
+  border-color: #f59e0b !important;
+  box-shadow: 0 4px 14px rgba(217, 119, 6, 0.4) !important;
+  animation: pulseEditBtn 2s infinite ease-in-out;
+}
+
+.btn.btn-edit-mode:hover {
+  background: linear-gradient(135deg, #b45309, #78350f) !important;
+}
+
+@keyframes pulseEditBtn {
+  0%, 100% { box-shadow: 0 4px 14px rgba(217, 119, 6, 0.4); }
+  50% { box-shadow: 0 4px 22px rgba(217, 119, 6, 0.7); }
+}
+
+/* ==========================================================================
+   SUPER ADMIN EDIT BANNER
+   ========================================================================== */
+
+.super-admin-edit-banner {
+  background: #fffbeb;
+  border: 2px solid #f59e0b;
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 16px rgba(217, 119, 6, 0.15);
+  animation: modalPopIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.super-admin-edit-banner .edit-banner-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.super-admin-edit-banner .edit-banner-badge {
+  display: inline-block;
+  background: #f59e0b;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  text-transform: uppercase;
+}
+
+.super-admin-edit-banner .btn-cancel-edit-banner {
+  background: #ffffff;
+  color: #b45309;
+  border: 1px solid #fde68a;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.super-admin-edit-banner .btn-cancel-edit-banner:hover {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.super-admin-edit-banner .edit-banner-body {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.super-admin-edit-banner .edit-banner-icon {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.super-admin-edit-banner .edit-banner-info {
+  flex: 1;
+}
+
+.super-admin-edit-banner .edit-banner-info strong {
+  display: block;
+  font-size: 14px;
+  color: #92400e;
+  margin-bottom: 2px;
+}
+
+.super-admin-edit-banner .edit-banner-info p {
+  margin: 0 0 8px;
+  font-size: 11.5px;
+  color: #b45309;
+  font-family: monospace;
+}
+
+.super-admin-edit-banner .edit-banner-note {
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid #fde68a;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 11px;
+  color: #78350f;
+  line-height: 1.4;
+}
+
 .pending-approval-row {
   background: #fffdf5;
 }

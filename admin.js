@@ -161,6 +161,9 @@ class AdminConsoleManager {
       return;
     }
 
+    const currentUserEmail = (window.supabaseManager && window.supabaseManager.currentUser && window.supabaseManager.currentUser.email) || "";
+    const isSuperAdmin = (currentUserEmail.toLowerCase().trim() === this.superAdminEmail.toLowerCase().trim());
+
     this.tablePdfsBody.innerHTML = pdfs.map((row) => {
       const dateStr = row.created_at ? new Date(row.created_at).toLocaleString() : "N/A";
       return `
@@ -179,6 +182,15 @@ class AdminConsoleManager {
                 </svg>
                 View
               </a>
+            ` : ""}
+            ${isSuperAdmin ? `
+              <button type="button" class="btn-action btn-edit-card" onclick="window.adminConsole.editPdf('${row.id}')" title="Super Admin: Edit Form Details & Replace PDF">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                </svg>
+                Edit Card
+              </button>
             ` : ""}
             <button type="button" class="btn-action btn-delete" onclick="window.adminConsole.deletePdf('${row.id}', '${row.storage_path}')" title="Delete PDF">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
@@ -379,6 +391,24 @@ class AdminConsoleManager {
       await this.loadData();
     } else {
       alert("Failed to delete PDF record.");
+    }
+  }
+
+  editPdf(id) {
+    const record = this.cachedPdfList.find(x => x.id === id);
+    if (!record) {
+      alert("PDF card record not found.");
+      return;
+    }
+    const currentUserEmail = (window.supabaseManager && window.supabaseManager.currentUser && window.supabaseManager.currentUser.email) || "";
+    if (currentUserEmail.toLowerCase().trim() !== this.superAdminEmail.toLowerCase().trim()) {
+      alert("Action Denied: Only the Super Admin is authorized to edit cards and replace PDFs.");
+      return;
+    }
+
+    this.closeConsole();
+    if (window.startSuperAdminEditCard) {
+      window.startSuperAdminEditCard(record);
     }
   }
 

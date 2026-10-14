@@ -570,9 +570,23 @@ class SupabaseManager {
         } catch (e) {}
       }
 
+      const cardMetadata = {
+        englishName: farmerData.englishName || "Farmer",
+        marathiName: farmerData.marathiName || "",
+        dobDate: farmerData.dobDate || "",
+        dob: farmerData.dob || "",
+        gender: farmerData.gender || "Male",
+        mobile: farmerData.mobile || "",
+        aadhaar: farmerData.aadhaar || "",
+        cardNumber: farmerData.cardNumber || "",
+        address: farmerData.address || "",
+        lands: farmerData.lands || [],
+        photoDataUrl: farmerData.photoDataUrl || "",
+      };
+
       const rowData = {
-        user_id: this.currentUser ? this.currentUser.id : null,
-        user_email: this.currentUser ? this.currentUser.email : "guest",
+        user_id: farmerData.userId || (this.currentUser ? this.currentUser.id : null),
+        user_email: farmerData.userEmail || (this.currentUser ? this.currentUser.email : "guest"),
         filename: filename,
         english_name: farmerData.englishName || "Farmer",
         marathi_name: farmerData.marathiName || "",
@@ -582,17 +596,36 @@ class SupabaseManager {
         created_at: new Date().toISOString(),
         storage_path: storagePath,
         public_url: publicUrl,
+        card_data: cardMetadata,
       };
 
-      const { data: dbData, error: dbError } = await this.client
+      let { data: dbData, error: dbError } = await this.client
         .from(this.tableName)
-        .insert([rowData]);
+        .insert([rowData])
+        .select();
+
+      // Graceful fallback if card_data column is not present in PostgreSQL table yet
+      if (dbError && dbError.message && dbError.message.includes("card_data")) {
+        console.warn("Retrying insert without card_data column:", dbError.message);
+        delete rowData.card_data;
+        const retryRes = await this.client.from(this.tableName).insert([rowData]).select();
+        dbData = retryRes.data;
+        dbError = retryRes.error;
+      }
 
       if (dbError) {
         console.warn("Supabase DB Insert Notice:", dbError.message);
       }
 
-      return { storageData, publicUrl };
+      // Cache metadata in localStorage for offline & instant pre-fill
+      try {
+        const metaStr = JSON.stringify(cardMetadata);
+        if (storagePath) localStorage.setItem(`farmer_card_meta_${storagePath}`, metaStr);
+        if (filename) localStorage.setItem(`farmer_card_meta_${filename}`, metaStr);
+        if (dbData && dbData[0] && dbData[0].id) localStorage.setItem(`farmer_card_meta_${dbData[0].id}`, metaStr);
+      } catch (e) {}
+
+      return { storageData, publicUrl, dbData };
     } catch (err) {
       console.error("Supabase PDF Upload Error:", err);
       return null;

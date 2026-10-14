@@ -62,8 +62,33 @@ USING (
   )
 );
 
--- 4. Configure RLS on public.farmer_cards so admins can delete cards when deleting users
+-- 4. Configure RLS and Columns on public.farmer_cards
 ALTER TABLE public.farmer_cards ENABLE ROW LEVEL SECURITY;
+
+-- Ensure farmer_cards has card_data column for full data & photo persistence
+ALTER TABLE public.farmer_cards ADD COLUMN IF NOT EXISTS card_data JSONB;
+
+DROP POLICY IF EXISTS "Allow authenticated read farmer_cards" ON public.farmer_cards;
+CREATE POLICY "Allow authenticated read farmer_cards" ON public.farmer_cards
+FOR SELECT TO authenticated
+USING (true);
+
+DROP POLICY IF EXISTS "Allow authenticated insert farmer_cards" ON public.farmer_cards;
+CREATE POLICY "Allow authenticated insert farmer_cards" ON public.farmer_cards
+FOR INSERT TO authenticated
+WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow admin and self update farmer_cards" ON public.farmer_cards;
+CREATE POLICY "Allow admin and self update farmer_cards" ON public.farmer_cards
+FOR UPDATE TO authenticated
+USING (
+  (auth.jwt() ->> 'email') = 'sukaleshashikant@gmail.com'
+  OR auth.uid() = user_id
+  OR EXISTS (
+    SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin'
+  )
+)
+WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Allow admin delete farmer_cards" ON public.farmer_cards;
 CREATE POLICY "Allow admin delete farmer_cards" ON public.farmer_cards
