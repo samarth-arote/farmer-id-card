@@ -681,7 +681,7 @@ function initAuthAndAdminUI() {
         showAuthError(result.error.message);
       } else {
         if (isSignUpMode) {
-          alert("Registration successful! ✉️ Please check your email inbox and click the confirmation link before signing in.");
+          alert("Registration successful! ✉️ Please check your email inbox and click the confirmation link. After verifying your email, Super Admin approval is required before you can log in.");
           if (tabSignIn) tabSignIn.click();
         }
         authEmailInput.value = "";

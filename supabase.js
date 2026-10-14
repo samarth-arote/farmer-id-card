@@ -23,10 +23,51 @@ class SupabaseManager {
     if (window.supabase && window.supabase.createClient) {
       this.client = window.supabase.createClient(this.supabaseUrl, this.supabaseKey);
       console.log("Supabase Client initialized ⚡");
+      this.checkUrlAuthParams();
       this.checkCurrentSession();
       this.initAuthGuard();
+
+      this.client.auth.onAuthStateChange(async (event, session) => {
+        if (event === "SIGNED_IN" || event === "USER_UPDATED" || event === "TOKEN_REFRESHED") {
+          await this.checkCurrentSession();
+        } else if (event === "SIGNED_OUT") {
+          this.clearUserSession();
+        }
+      });
     } else {
       setTimeout(() => this.initClient(), 250);
+    }
+  }
+
+  // DETECT AND HANDLE AUTH CALLBACK HASH ERRORS (e.g. OTP EXPIRED)
+  checkUrlAuthParams() {
+    try {
+      const hash = window.location.hash;
+      if (!hash) return;
+
+      const params = new URLSearchParams(hash.replace(/^#/, ""));
+      const error = params.get("error");
+      const errorCode = params.get("error_code");
+      const errorDesc = params.get("error_description");
+
+      if (error || errorCode) {
+        console.warn("Auth URL error detected:", errorCode, errorDesc);
+        if (errorCode === "otp_expired") {
+          setTimeout(() => {
+            alert("Email Confirmation Notice:\n\nThis confirmation link is invalid, expired, or has already been used.\n\nIf your email was already confirmed, you can sign in directly. Otherwise, register again or request a new link.");
+          }, 300);
+        } else if (errorDesc) {
+          setTimeout(() => {
+            alert(`Email Confirmation Notice:\n\n${errorDesc.replace(/\+/g, " ")}`);
+          }, 300);
+        }
+        // Clean up hash from URL bar
+        if (window.history && window.history.replaceState) {
+          window.history.replaceState(null, "", window.location.pathname + window.location.search);
+        }
+      }
+    } catch (e) {
+      console.warn("Error parsing auth URL params:", e);
     }
   }
 
@@ -86,6 +127,30 @@ class SupabaseManager {
       if (session && session.user) {
         const isSuperAdmin = (session.user.email || "").toLowerCase().trim() === this.superAdminEmail.toLowerCase().trim();
         if (session.user.email_confirmed_at || isSuperAdmin) {
+          if (!isSuperAdmin) {
+            // Check approval status in profile
+            let { data: profile } = await this.client
+              .from(this.profilesTable)
+              .select("*")
+              .eq("id", session.user.id)
+              .maybeSingle();
+
+            if (!profile && session.user.email) {
+              const { data: pEmail } = await this.client
+                .from(this.profilesTable)
+                .select("*")
+                .eq("email", session.user.email)
+                .maybeSingle();
+              profile = pEmail;
+            }
+
+            if (!profile || profile.role === "pending_approval" || profile.approved === false) {
+              console.warn("Session revoked: User pending Super Admin approval or not found in database");
+              await this.client.auth.signOut();
+              this.clearUserSession();
+              return;
+            }
+          }
           await this.setUserSession(session.user);
         } else {
           this.clearUserSession();
@@ -100,16 +165,44 @@ class SupabaseManager {
   }
 
   async setUserSession(user) {
-    this.currentUser = user;
     if (!user) {
+      this.currentUser = null;
       this.isAdmin = false;
       this.updateUIForSession();
       return;
     }
 
     const email = (user.email || "").toLowerCase().trim();
+    const isSuperAdmin = (email === this.superAdminEmail.toLowerCase().trim());
 
-    if (email === this.superAdminEmail.toLowerCase()) {
+    // HARD SECURITY GATE: Double check approval before granting UI access
+    if (!isSuperAdmin) {
+      let { data: profile } = await this.client
+        .from(this.profilesTable)
+        .select("*")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (!profile && user.email) {
+        const { data: pEmail } = await this.client
+          .from(this.profilesTable)
+          .select("*")
+          .eq("email", user.email)
+          .maybeSingle();
+        profile = pEmail;
+      }
+
+      if (!profile || profile.role === "pending_approval" || profile.approved === false) {
+        console.warn("setUserSession blocked unapproved or deleted user:", user.email);
+        await this.client.auth.signOut();
+        this.clearUserSession();
+        return;
+      }
+    }
+
+    this.currentUser = user;
+
+    if (isSuperAdmin) {
       this.isAdmin = true;
       try {
         await this.client.from(this.profilesTable).upsert([
@@ -194,6 +287,7 @@ class SupabaseManager {
 
       const isSuperAdmin = (email.toLowerCase().trim() === this.superAdminEmail.toLowerCase().trim());
 
+      // 1. Email verification check
       if (data.user && !data.user.email_confirmed_at && !isSuperAdmin) {
         await this.client.auth.signOut();
         return {
@@ -201,6 +295,53 @@ class SupabaseManager {
             message: "Email not confirmed yet. Please check your email inbox and click the confirmation link before signing in."
           }
         };
+      }
+
+      // 2. Super Admin bypasses approval check
+      if (isSuperAdmin) {
+        await this.setUserSession(data.user);
+        return { data };
+      }
+
+      // 3. Super Admin Approval Verification
+      try {
+        let { data: profile } = await this.client
+          .from(this.profilesTable)
+          .select("*")
+          .eq("id", data.user.id)
+          .maybeSingle();
+
+        if (!profile && data.user.email) {
+          const { data: profileByEmail } = await this.client
+            .from(this.profilesTable)
+            .select("*")
+            .eq("email", data.user.email)
+            .maybeSingle();
+          profile = profileByEmail;
+        }
+
+        if (!profile) {
+          await this.client.auth.signOut();
+          return {
+            error: {
+              message: "Access Denied: Your account record was declined or deleted by the Super Admin."
+            }
+          };
+        }
+
+        const userRole = (profile.role || "").toLowerCase().trim();
+        const isPending = (userRole === "pending_approval" || profile.approved === false);
+
+        if (isPending) {
+          await this.client.auth.signOut();
+          return {
+            error: {
+              message: "Account pending approval. Your email is verified, but your account must be approved by the Super Admin before you can log in."
+            }
+          };
+        }
+      } catch (checkErr) {
+        console.warn("Approval status check notice:", checkErr);
       }
 
       await this.setUserSession(data.user);
@@ -215,9 +356,16 @@ class SupabaseManager {
     if (!this.client) return { error: { message: "Supabase not ready" } };
 
     try {
+      const currentUrl = (window.location.origin && window.location.origin !== "null")
+        ? (window.location.origin + window.location.pathname)
+        : window.location.href.split("#")[0].split("?")[0];
+
       const { data, error } = await this.client.auth.signUp({
         email: email.trim(),
         password: password,
+        options: {
+          emailRedirectTo: currentUrl,
+        },
       });
 
       if (error) {
@@ -226,20 +374,60 @@ class SupabaseManager {
 
       if (data.user) {
         const isConfirmed = !!data.user.email_confirmed_at;
-        await this.client.from(this.profilesTable).upsert([
+        // Attempt upsert with approved: false and role: "pending_approval"
+        const { error: upsertErr } = await this.client.from(this.profilesTable).upsert([
           {
             id: data.user.id,
             email: data.user.email,
-            role: "user",
+            role: "pending_approval",
+            approved: false,
             confirmed: isConfirmed,
             created_at: new Date().toISOString(),
           }
         ]);
+
+        if (upsertErr) {
+          // Fallback if 'approved' column is not in schema
+          console.warn("Retrying profile upsert without approved column:", upsertErr.message);
+          await this.client.from(this.profilesTable).upsert([
+            {
+              id: data.user.id,
+              email: data.user.email,
+              role: "pending_approval",
+              confirmed: isConfirmed,
+              created_at: new Date().toISOString(),
+            }
+          ]);
+        }
       }
 
       return { data, requiresConfirmation: true };
     } catch (err) {
       return { error: { message: err.message || "Registration failed" } };
+    }
+  }
+
+  // SUPABASE AUTH: RESEND CONFIRMATION EMAIL
+  async resendConfirmationEmail(email) {
+    if (!this.client || !email) return { error: { message: "Valid email is required" } };
+
+    try {
+      const currentUrl = (window.location.origin && window.location.origin !== "null")
+        ? (window.location.origin + window.location.pathname)
+        : window.location.href.split("#")[0].split("?")[0];
+
+      const { data, error } = await this.client.auth.resend({
+        type: "signup",
+        email: email.trim(),
+        options: {
+          emailRedirectTo: currentUrl,
+        },
+      });
+
+      if (error) return { error };
+      return { data, success: true };
+    } catch (err) {
+      return { error: { message: err.message || "Failed to resend confirmation email" } };
     }
   }
 
@@ -530,7 +718,63 @@ class SupabaseManager {
     }
   }
 
-  // ADMIN API: DELETE USER ACCOUNT
+  // ADMIN API: APPROVE USER ACCOUNT (SUPER ADMIN APPROVAL)
+  async approveUser(userId, userEmail) {
+    if (!this.client) return false;
+
+    try {
+      // 1. Try calling the PostgreSQL RPC function (bypasses RLS issues)
+      try {
+        const { data: rpcSuccess, error: rpcErr } = await this.client.rpc("approve_user_by_admin", {
+          target_user_id: userId || null,
+          target_user_email: userEmail || null,
+        });
+
+        if (!rpcErr && rpcSuccess) {
+          console.log("User approved via RPC approve_user_by_admin ⚡");
+          return true;
+        }
+      } catch (rpcEx) {
+        console.warn("RPC approve notice, falling back to direct table update:", rpcEx);
+      }
+
+      // 2. Direct table update fallback
+      let updateSuccess = false;
+      const { data: d1, error: err1 } = await this.client
+        .from(this.profilesTable)
+        .update({ role: "user", approved: true, confirmed: true })
+        .eq("id", userId)
+        .select();
+
+      if (!err1 && d1 && d1.length > 0) {
+        updateSuccess = true;
+      } else {
+        // Fallback without approved column
+        const { data: d2, error: err2 } = await this.client
+          .from(this.profilesTable)
+          .update({ role: "user", confirmed: true })
+          .eq("id", userId)
+          .select();
+        if (!err2 && d2 && d2.length > 0) updateSuccess = true;
+      }
+
+      if (!updateSuccess && userEmail) {
+        const { data: d3, error: errEmail } = await this.client
+          .from(this.profilesTable)
+          .update({ role: "user", confirmed: true })
+          .eq("email", userEmail)
+          .select();
+        if (!errEmail && d3 && d3.length > 0) updateSuccess = true;
+      }
+
+      return updateSuccess;
+    } catch (err) {
+      console.error("Approve User Error:", err);
+      return false;
+    }
+  }
+
+  // ADMIN API: DELETE USER ACCOUNT (INSTANT CASCADE CLEANUP)
   async deleteUserRecord(userId, userEmail) {
     if (!this.client) return false;
 
@@ -540,13 +784,68 @@ class SupabaseManager {
     }
 
     try {
-      const { error } = await this.client
-        .from(this.profilesTable)
-        .delete()
-        .eq("id", userId);
+      // 1. Try calling PostgreSQL RPC function (deletes from profiles, farmer_cards, and auth.users)
+      try {
+        const { data: rpcSuccess, error: rpcErr } = await this.client.rpc("delete_user_by_admin", {
+          target_user_id: userId || null,
+          target_user_email: userEmail || null,
+        });
 
-      if (error) throw error;
-      return true;
+        if (!rpcErr && rpcSuccess) {
+          console.log("User deleted via RPC delete_user_by_admin ⚡");
+          return true;
+        }
+        if (rpcErr) {
+          console.warn("RPC delete notice, falling back to direct table delete:", rpcErr.message);
+        }
+      } catch (rpcEx) {
+        console.warn("RPC delete call notice:", rpcEx);
+      }
+
+      // 2. Cascade delete associated farmer_cards to avoid foreign key / constraint locks
+      try {
+        if (userId) {
+          await this.client.from(this.tableName).delete().eq("user_id", userId);
+        }
+        if (userEmail) {
+          await this.client.from(this.tableName).delete().eq("user_email", userEmail);
+        }
+      } catch (cardErr) {
+        console.warn("Cascade delete farmer_cards notice:", cardErr);
+      }
+
+      // 3. Delete from profiles table with verification
+      let deleteSuccess = false;
+      if (userId) {
+        const { data, error, count } = await this.client
+          .from(this.profilesTable)
+          .delete({ count: "exact" })
+          .eq("id", userId)
+          .select();
+
+        if (!error && ((data && data.length > 0) || count > 0)) {
+          deleteSuccess = true;
+        }
+      }
+
+      // 4. Fallback / supplementary delete from profiles table by email
+      if (!deleteSuccess && userEmail) {
+        const { data, error, count } = await this.client
+          .from(this.profilesTable)
+          .delete({ count: "exact" })
+          .eq("email", userEmail)
+          .select();
+
+        if (!error && ((data && data.length > 0) || count > 0)) {
+          deleteSuccess = true;
+        }
+      }
+
+      if (!deleteSuccess) {
+        console.warn("Delete completed with 0 rows removed. Supabase RLS policy is likely blocking delete.");
+      }
+
+      return deleteSuccess;
     } catch (err) {
       console.error("Delete User Error:", err);
       return false;

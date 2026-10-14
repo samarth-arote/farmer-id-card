@@ -311,7 +311,7 @@ button, input, select, textarea {
 .admin-stats-grid {
   padding: 16px 24px;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   gap: 16px;
   background: #ffffff;
   border-bottom: 1px solid var(--border-subtle);
@@ -328,6 +328,11 @@ button, input, select, textarea {
   gap: 14px;
 }
 
+.stat-card.highlight-card {
+  border-color: #fde68a;
+  background: #fffdf5;
+}
+
 .stat-icon-wrapper {
   width: 44px;
   height: 44px;
@@ -338,6 +343,11 @@ button, input, select, textarea {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+}
+
+.stat-icon-wrapper.pending-icon {
+  background: #fef3c7;
+  color: #b45309;
 }
 
 .stat-info {
@@ -489,6 +499,36 @@ button, input, select, textarea {
   background: #fff7ed;
   color: #c2410c;
   border-color: #ffedd5;
+}
+
+.btn-approve {
+  background: #def7ec;
+  color: #03543f;
+  border-color: #31c48d;
+}
+
+.btn-approve:hover {
+  background: #bcf0da;
+  color: #023a2b;
+}
+
+.btn-decline {
+  background: #fde8e8;
+  color: #9b1c1c;
+  border-color: #f98080;
+}
+
+.btn-decline:hover {
+  background: #fbd5d5;
+  color: #771d1d;
+}
+
+.pending-approval-row {
+  background: #fffdf5;
+}
+
+.pending-approval-row:hover {
+  background: #fef9ed;
 }
 
 .role-badge {

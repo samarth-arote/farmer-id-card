@@ -52,6 +52,8 @@ class AdminConsoleManager {
 
     this.tablePdfsBody = document.getElementById("tablePdfsBody");
     this.tableUsersBody = document.getElementById("tableUsersBody");
+    this.tablePendingApprovalUsersBody = document.getElementById("tablePendingApprovalUsersBody");
+    this.tableUnconfirmedUsersBody = document.getElementById("tableUnconfirmedUsersBody");
   }
 
   bindEvents() {
@@ -115,7 +117,7 @@ class AdminConsoleManager {
     this.cachedPdfList = pdfs;
     this.cachedUsersList = users;
 
-    this.updateStats(pdfs.length, users.length);
+    this.updateStats(pdfs.length, users);
     this.renderPdfsTable(pdfs);
     this.renderUsersTable(users);
   }
@@ -127,15 +129,27 @@ class AdminConsoleManager {
     if (this.tableUsersBody) {
       this.tableUsersBody.innerHTML = `<tr><td colspan="6" class="text-center">Loading user records from Supabase...</td></tr>`;
     }
+    if (this.tablePendingApprovalUsersBody) {
+      this.tablePendingApprovalUsersBody.innerHTML = `<tr><td colspan="5" class="text-center">Loading pending approvals...</td></tr>`;
+    }
   }
 
-  updateStats(pdfCount, userCount) {
+  updateStats(pdfCount, users = []) {
     const statPdfs = document.getElementById("statTotalPdfs");
     const statUsers = document.getElementById("statTotalUsers");
+    const statPending = document.getElementById("statPendingApprovals");
     const statStorage = document.getElementById("statStorageStatus");
 
+    const usersList = Array.isArray(users) ? users : [];
+    const pendingApprovals = usersList.filter((u) => {
+      const email = (u.email || "").toLowerCase().trim();
+      const isSuper = email === this.superAdminEmail.toLowerCase().trim();
+      return !isSuper && (u.role === "pending_approval" || u.approved === false);
+    });
+
     if (statPdfs) statPdfs.textContent = pdfCount;
-    if (statUsers) statUsers.textContent = userCount;
+    if (statUsers) statUsers.textContent = usersList.length;
+    if (statPending) statPending.textContent = pendingApprovals.length;
     if (statStorage) statStorage.textContent = "Supabase Active 🟢";
   }
 
@@ -180,15 +194,38 @@ class AdminConsoleManager {
   }
 
   renderUsersTable(users) {
+    const tablePendingBody = document.getElementById("tablePendingApprovalUsersBody");
     const tableUsersBody = document.getElementById("tableUsersBody");
     const tableUnconfirmedBody = document.getElementById("tableUnconfirmedUsersBody");
 
-    const confirmedUsers = users.filter((u) => u.confirmed !== false);
-    const unconfirmedUsers = users.filter((u) => u.confirmed === false);
+    const pendingApprovalUsers = [];
+    const confirmedUsers = [];
+    const unconfirmedUsers = [];
+
+    users.forEach((u) => {
+      const email = (u.email || "").toLowerCase().trim();
+      const isSuper = email === this.superAdminEmail.toLowerCase().trim();
+
+      if (!isSuper && (u.role === "pending_approval" || u.approved === false)) {
+        pendingApprovalUsers.push(u);
+      } else if (u.confirmed !== false) {
+        confirmedUsers.push(u);
+      } else {
+        unconfirmedUsers.push(u);
+      }
+    });
+
+    if (tablePendingBody) {
+      if (pendingApprovalUsers.length === 0) {
+        tablePendingBody.innerHTML = `<tr><td colspan="5" class="text-center" style="padding: 16px; color: var(--text-muted);">No users awaiting Super Admin approval. All clear! ✨</td></tr>`;
+      } else {
+        tablePendingBody.innerHTML = pendingApprovalUsers.map((u) => this.renderPendingApprovalRow(u)).join("");
+      }
+    }
 
     if (tableUsersBody) {
       if (confirmedUsers.length === 0) {
-        tableUsersBody.innerHTML = `<tr><td colspan="6" class="text-center">No confirmed users yet.</td></tr>`;
+        tableUsersBody.innerHTML = `<tr><td colspan="6" class="text-center" style="padding: 16px; color: var(--text-muted);">No confirmed users yet.</td></tr>`;
       } else {
         tableUsersBody.innerHTML = confirmedUsers.map((u) => this.renderUserRow(u, true)).join("");
       }
@@ -196,11 +233,45 @@ class AdminConsoleManager {
 
     if (tableUnconfirmedBody) {
       if (unconfirmedUsers.length === 0) {
-        tableUnconfirmedBody.innerHTML = `<tr><td colspan="6" class="text-center">No pending unconfirmed users. All registered users are confirmed!</td></tr>`;
+        tableUnconfirmedBody.innerHTML = `<tr><td colspan="6" class="text-center" style="padding: 16px; color: var(--text-muted);">No pending email confirmation users.</td></tr>`;
       } else {
         tableUnconfirmedBody.innerHTML = unconfirmedUsers.map((u) => this.renderUserRow(u, false)).join("");
       }
     }
+  }
+
+  renderPendingApprovalRow(u) {
+    const createdDate = u.created_at ? new Date(u.created_at) : new Date();
+    const dateStr = createdDate.toLocaleDateString() + " " + createdDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const isEmailVerified = u.confirmed !== false;
+
+    return `
+      <tr class="pending-approval-row">
+        <td><code>${(u.id || "1").slice(0, 8)}...</code></td>
+        <td><strong>${u.email}</strong></td>
+        <td>
+          <span class="status-badge ${isEmailVerified ? "confirmed" : "pending"}">
+            ${isEmailVerified ? "Email Verified 🟢" : "Awaiting Verification 🟡"}
+          </span>
+        </td>
+        <td>${dateStr}</td>
+        <td class="action-cell">
+          <button type="button" class="btn-action btn-approve" onclick="window.adminConsole.approveUser('${u.id}', '${u.email}')" title="Approve user for full login access">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            Approve Access
+          </button>
+          <button type="button" class="btn-action btn-decline" onclick="window.adminConsole.declineUser('${u.id}', '${u.email}')" title="Decline and delete user record">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+            Decline & Delete
+          </button>
+        </td>
+      </tr>
+    `;
   }
 
   renderUserRow(u, isConfirmed) {
@@ -209,11 +280,6 @@ class AdminConsoleManager {
     
     const isSuperAdmin = (u.email && u.email.toLowerCase().trim() === this.superAdminEmail.toLowerCase().trim());
     const isAdmin = isSuperAdmin || (u.role === "admin");
-
-    const createdTime = createdDate.getTime();
-    const hoursElapsed = (Date.now() - createdTime) / (1000 * 60 * 60);
-    const hasPassed24h = (hoursElapsed >= 24);
-    const hoursRemaining = Math.max(1, Math.ceil(24 - hoursElapsed));
 
     return `
       <tr>
@@ -241,19 +307,21 @@ class AdminConsoleManager {
             <button type="button" class="btn-action ${isAdmin ? "btn-demote" : "btn-promote"}" onclick="window.adminConsole.toggleRole('${u.id}', '${u.email}', '${isAdmin ? "user" : "admin"}')">
               ${isAdmin ? "Demote to User" : "Promote to Admin"}
             </button>
-            <button type="button" class="btn-action btn-delete" onclick="window.adminConsole.deleteUser('${u.id}', '${u.email}', true)">
+            <button type="button" class="btn-action btn-delete" onclick="window.adminConsole.deleteUser('${u.id}', '${u.email}')" title="Delete User">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
               Delete User
             </button>
           ` : `
-            ${hasPassed24h ? `
-              <button type="button" class="btn-action btn-delete" onclick="window.adminConsole.deleteUser('${u.id}', '${u.email}', false)" title="User failed to validate email in 24h. Delete allowed.">
-                Delete (Passed 24h)
-              </button>
-            ` : `
-              <span class="badge-waiting" title="Deletion unlocks 24h after registration if email is not validated">
-                ⏰ Wait ${hoursRemaining}h to delete
-              </span>
-            `}
+            <button type="button" class="btn-action btn-delete" onclick="window.adminConsole.deleteUser('${u.id}', '${u.email}')" title="Delete Pending User">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+              Delete User
+            </button>
           `}
         </td>
       </tr>
@@ -352,21 +420,10 @@ class AdminConsoleManager {
     }
   }
 
-  async deleteUser(userId, userEmail, isConfirmed = true) {
+  async deleteUser(userId, userEmail) {
     if (userEmail.toLowerCase().trim() === this.superAdminEmail.toLowerCase().trim()) {
       alert("Action Denied: Primary Super Admin account cannot be deleted!");
       return;
-    }
-
-    const targetUser = this.cachedUsersList.find(x => x.id === userId);
-    if (!isConfirmed && targetUser) {
-      const createdTime = new Date(targetUser.created_at || Date.now()).getTime();
-      const hoursElapsed = (Date.now() - createdTime) / (1000 * 60 * 60);
-
-      if (hoursElapsed < 24) {
-        alert(`Action Denied: Pending user registration is under 24 hours old. Admin deletion unlocks 24 hours after registration (${Math.ceil(24 - hoursElapsed)}h remaining).`);
-        return;
-      }
     }
 
     if (!confirm(`Are you sure you want to permanently delete user account "${userEmail}"?`)) {
@@ -378,7 +435,35 @@ class AdminConsoleManager {
       alert(`User account "${userEmail}" deleted successfully.`);
       await this.loadData();
     } else {
-      alert("Failed to delete user account.");
+      alert(`Action could not be completed on Supabase.\n\nSupabase Row Level Security (RLS) is blocking the DELETE request for this user record.\n\nPlease run the provided SQL script in your Supabase SQL Editor to grant admin deletion and management permissions.`);
+    }
+  }
+
+  async approveUser(userId, userEmail) {
+    if (!confirm(`Approve full access for user "${userEmail}"?`)) {
+      return;
+    }
+
+    const ok = await window.supabaseManager.approveUser(userId, userEmail);
+    if (ok) {
+      alert(`User "${userEmail}" has been approved! They can now sign in.`);
+      await this.loadData();
+    } else {
+      alert("Failed to approve user.");
+    }
+  }
+
+  async declineUser(userId, userEmail) {
+    if (!confirm(`Are you sure you want to DECLINE user "${userEmail}"?\n\nThis will permanently delete their account record.`)) {
+      return;
+    }
+
+    const ok = await window.supabaseManager.deleteUserRecord(userId, userEmail);
+    if (ok) {
+      alert(`User "${userEmail}" has been declined and their record was deleted.`);
+      await this.loadData();
+    } else {
+      alert("Failed to decline user.");
     }
   }
 }
