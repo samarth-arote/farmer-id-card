@@ -204,6 +204,154 @@ button, input, select, textarea {
 }
 
 /* ==========================================================================
+   AWAITING SUPER ADMIN APPROVAL SCREEN STYLES
+   ========================================================================== */
+
+.auth-pending-screen {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  animation: modalPopIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.pending-icon-circle {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: #fef3c7;
+  color: #d97706;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+  border: 2px solid #fde68a;
+  box-shadow: 0 4px 14px rgba(217, 119, 6, 0.2);
+}
+
+.pending-status-pill {
+  display: inline-block;
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fde68a;
+  padding: 3px 12px;
+  border-radius: 20px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.auth-pending-screen h3 {
+  margin: 0;
+  font-family: 'Poppins', sans-serif;
+  font-size: 18px;
+  color: var(--primary-dark);
+  font-weight: 700;
+}
+
+.pending-email-badge {
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  padding: 4px 12px;
+  border-radius: 8px;
+  font-size: 11.5px;
+  color: #374151;
+  font-weight: 600;
+  margin: 6px 0 14px;
+  word-break: break-all;
+}
+
+.pending-flow-steps {
+  width: 100%;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 14px;
+  text-align: left;
+}
+
+.flow-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.flow-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+
+.flow-step.completed .flow-icon {
+  background: #def7ec;
+  color: #03543f;
+  border: 1px solid #31c48d;
+}
+
+.flow-step.current .flow-icon {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #f59e0b;
+}
+
+.flow-content {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.flow-content strong {
+  font-size: 11.5px;
+  color: #111827;
+}
+
+.flow-content small {
+  font-size: 10.5px;
+  color: #6b7280;
+}
+
+.pending-alert-box {
+  background: #fffdf5;
+  border: 1px solid #fef08a;
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 16px;
+}
+
+.pending-alert-box p {
+  margin: 0;
+  font-size: 11px;
+  color: #854d0e;
+  line-height: 1.35;
+}
+
+.pending-btn-row {
+  width: 100%;
+  display: flex;
+  gap: 10px;
+}
+
+.pending-btn-row .btn {
+  flex: 1;
+  padding: 9px 10px;
+  font-size: 12px;
+  justify-content: center;
+}
+
+/* ==========================================================================
    ATTRACTIVE ADMIN CONSOLE HEADER BUTTON & MODAL
    ========================================================================== */
 

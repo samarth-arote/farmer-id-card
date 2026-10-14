@@ -603,6 +603,14 @@ resetBtn.addEventListener("click", () => {
 form.addEventListener("submit", (e) => e.preventDefault());
 
 downloadBtn.addEventListener("click", async () => {
+  // HARD SECURITY GATE: Verify if user account is active and approved in Supabase
+  if (window.supabaseManager) {
+    const isAllowed = await window.supabaseManager.verifyActiveUserStatus(true);
+    if (!isAllowed) {
+      return;
+    }
+  }
+
   const aadhaarOk = isValidAadhaar(form.elements.aadhaar.value);
   if (!aadhaarOk) {
     alert("Aadhaar No must contain exactly 12 digits (format: 4 digits + space + 4 digits + space + 4 digits).");
@@ -624,15 +632,95 @@ downloadBtn.addEventListener("click", async () => {
 
 function initAuthAndAdminUI() {
   let isSignUpMode = false;
+  let lastAttemptedEmail = "";
 
   const tabSignIn = document.getElementById("tabSignIn");
   const tabSignUp = document.getElementById("tabSignUp");
+  const authTabsWrapper = document.getElementById("authTabsWrapper");
   const authForm = document.getElementById("authForm");
   const authEmailInput = document.getElementById("authEmail");
   const authPasswordInput = document.getElementById("authPassword");
   const btnAuthSubmit = document.getElementById("btnAuthSubmit");
   const authErrorMsg = document.getElementById("authErrorMsg");
   const btnLogout = document.getElementById("btnLogout");
+
+  // Pending approval screen elements
+  const authPendingScreen = document.getElementById("authPendingScreen");
+  const pendingUserEmailText = document.getElementById("pendingUserEmailText");
+  const btnCheckApprovalStatus = document.getElementById("btnCheckApprovalStatus");
+  const btnBackToSignIn = document.getElementById("btnBackToSignIn");
+
+  function showPendingApprovalView(email) {
+    lastAttemptedEmail = email || authEmailInput.value.trim();
+    if (pendingUserEmailText) {
+      pendingUserEmailText.textContent = lastAttemptedEmail || "user@domain.com";
+    }
+    if (authTabsWrapper) authTabsWrapper.classList.add("hidden");
+    if (authForm) authForm.classList.add("hidden");
+    if (authPendingScreen) authPendingScreen.classList.remove("hidden");
+  }
+
+  function hidePendingApprovalView() {
+    if (authPendingScreen) authPendingScreen.classList.add("hidden");
+    if (authTabsWrapper) authTabsWrapper.classList.remove("hidden");
+    if (authForm) authForm.classList.remove("hidden");
+    if (tabSignIn) tabSignIn.click();
+  }
+
+  if (btnBackToSignIn) {
+    btnBackToSignIn.addEventListener("click", () => {
+      hidePendingApprovalView();
+    });
+  }
+
+  if (btnCheckApprovalStatus) {
+    btnCheckApprovalStatus.addEventListener("click", async () => {
+      const emailToCheck = lastAttemptedEmail || authEmailInput.value.trim();
+      if (!emailToCheck) {
+        alert("Please enter your email to check approval status.");
+        hidePendingApprovalView();
+        return;
+      }
+
+      btnCheckApprovalStatus.disabled = true;
+      btnCheckApprovalStatus.textContent = "Checking...";
+
+      try {
+        const { data: profile } = await window.supabaseManager.client
+          .from("profiles")
+          .select("role, approved")
+          .eq("email", emailToCheck)
+          .maybeSingle();
+
+        btnCheckApprovalStatus.disabled = false;
+        btnCheckApprovalStatus.innerHTML = `
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+          </svg>
+          Check Status
+        `;
+
+        if (!profile) {
+          alert("Account Status: No account found or your registration was declined by the administrator.");
+          hidePendingApprovalView();
+          return;
+        }
+
+        const role = (profile.role || "").toLowerCase();
+        if (profile.approved === true || (role !== "pending_approval" && profile.approved !== false)) {
+          alert("🎉 Congratulations! Your account has been approved by the Super Admin.\n\nYou can now sign in!");
+          hidePendingApprovalView();
+        } else {
+          alert("⏳ Status: Your account is still awaiting Super Admin approval.\n\nPlease wait for the administrator to approve you.");
+        }
+      } catch (err) {
+        btnCheckApprovalStatus.disabled = false;
+        btnCheckApprovalStatus.textContent = "Check Status";
+        alert("Unable to verify status. Please try again in a few moments.");
+      }
+    });
+  }
 
   if (tabSignIn && tabSignUp) {
     tabSignIn.addEventListener("click", () => {
@@ -663,6 +751,7 @@ function initAuthAndAdminUI() {
         return;
       }
 
+      lastAttemptedEmail = email;
       btnAuthSubmit.disabled = true;
       btnAuthSubmit.textContent = "Processing...";
       if (authErrorMsg) authErrorMsg.classList.add("hidden");
@@ -678,11 +767,16 @@ function initAuthAndAdminUI() {
       btnAuthSubmit.textContent = isSignUpMode ? "Register Account" : "Sign In";
 
       if (result && result.error) {
-        showAuthError(result.error.message);
+        const errMsg = result.error.message || "";
+        if (errMsg.toLowerCase().includes("pending approval") || errMsg.toLowerCase().includes("approval")) {
+          showPendingApprovalView(email);
+        } else {
+          showAuthError(errMsg);
+        }
       } else {
         if (isSignUpMode) {
-          alert("Registration successful! ✉️ Please check your email inbox and click the confirmation link. After verifying your email, Super Admin approval is required before you can log in.");
-          if (tabSignIn) tabSignIn.click();
+          // Immediately display the Awaiting Super Admin Approval screen
+          showPendingApprovalView(email);
         }
         authEmailInput.value = "";
         authPasswordInput.value = "";

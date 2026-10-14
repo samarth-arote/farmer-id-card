@@ -30,7 +30,7 @@
       <h2>Farmer Card Portal</h2>
       <p class="auth-subtitle">Sign in or create an account to access the app</p>
 
-      <div class="auth-tabs">
+      <div class="auth-tabs" id="authTabsWrapper">
         <button type="button" class="auth-tab-btn active" id="tabSignIn">Sign In</button>
         <button type="button" class="auth-tab-btn" id="tabSignUp">Register</button>
       </div>
@@ -52,6 +52,60 @@
           Sign In
         </button>
       </form>
+
+      <!-- Awaiting Super Admin Approval Screen State -->
+      <div class="auth-pending-screen hidden" id="authPendingScreen">
+        <div class="pending-icon-circle">
+          <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+        </div>
+        <div class="pending-status-pill">WAITING FOR APPROVAL</div>
+        <h3>Approval Required</h3>
+        <p class="pending-email-badge" id="pendingUserEmailText">user@example.com</p>
+
+        <div class="pending-flow-steps">
+          <div class="flow-step completed">
+            <div class="flow-icon">✓</div>
+            <div class="flow-content">
+              <strong>1. Account Created</strong>
+              <small>Credentials registered</small>
+            </div>
+          </div>
+          <div class="flow-step completed">
+            <div class="flow-icon">✓</div>
+            <div class="flow-content">
+              <strong>2. Email Verification</strong>
+              <small>Check confirmation link in inbox</small>
+            </div>
+          </div>
+          <div class="flow-step current">
+            <div class="flow-icon pulse">⏳</div>
+            <div class="flow-content">
+              <strong>3. Super Admin Approval</strong>
+              <small>Administrator must approve your access</small>
+            </div>
+          </div>
+        </div>
+
+        <div class="pending-alert-box">
+          <p>Your account is registered, but access is locked until the Super Admin approves you from the Admin Panel. If declined, your record will be deleted.</p>
+        </div>
+
+        <div class="pending-btn-row">
+          <button type="button" class="btn btn-secondary" id="btnCheckApprovalStatus">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+            </svg>
+            Check Status
+          </button>
+          <button type="button" class="btn btn-primary" id="btnBackToSignIn">
+            Back to Sign In
+          </button>
+        </div>
+      </div>
 
       <div class="auth-footer">
         <p class="auth-footer-text">©2024 Farmer Card Generator. All rights reserved.</p>

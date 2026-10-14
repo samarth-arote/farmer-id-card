@@ -26,6 +26,7 @@ class SupabaseManager {
       this.checkUrlAuthParams();
       this.checkCurrentSession();
       this.initAuthGuard();
+      this.startLiveSessionVerifier();
 
       this.client.auth.onAuthStateChange(async (event, session) => {
         if (event === "SIGNED_IN" || event === "USER_UPDATED" || event === "TOKEN_REFRESHED") {
@@ -36,6 +37,65 @@ class SupabaseManager {
       });
     } else {
       setTimeout(() => this.initClient(), 250);
+    }
+  }
+
+  // REAL-TIME SESSION HEARTBEAT: POLLS DATABASE TO DETECT INSTANT USER DELETION OR UNAPPROVAL
+  startLiveSessionVerifier() {
+    // Check every 6 seconds
+    setInterval(async () => {
+      if (this.currentUser) {
+        await this.verifyActiveUserStatus(false);
+      }
+    }, 6000);
+
+    // Check immediately when user switches focus to this browser tab
+    document.addEventListener("visibilitychange", async () => {
+      if (document.visibilityState === "visible" && this.currentUser) {
+        await this.verifyActiveUserStatus(false);
+      }
+    });
+  }
+
+  // ON-DEMAND LIVE VERIFICATION: USED BEFORE GENERATING OR DOWNLOADING ANY CARD
+  async verifyActiveUserStatus(showAlert = true) {
+    if (!this.client || !this.currentUser) return false;
+    const isSuperAdmin = (this.currentUser.email || "").toLowerCase().trim() === this.superAdminEmail.toLowerCase().trim();
+    if (isSuperAdmin) return true;
+
+    try {
+      let { data: profile } = await this.client
+        .from(this.profilesTable)
+        .select("id, email, role, approved")
+        .eq("id", this.currentUser.id)
+        .maybeSingle();
+
+      if (!profile && this.currentUser.email) {
+        const { data: pEmail } = await this.client
+          .from(this.profilesTable)
+          .select("id, email, role, approved")
+          .eq("email", this.currentUser.email)
+          .maybeSingle();
+        profile = pEmail;
+      }
+
+      // If user row is gone (deleted by admin) or pending approval
+      if (!profile || profile.role === "pending_approval" || profile.approved === false) {
+        console.warn("Live security check failed: user revoked/deleted:", this.currentUser.email);
+        await this.client.auth.signOut();
+        this.clearUserSession();
+        if (showAlert) {
+          alert("Access Denied: Your user account was deleted or is pending Super Admin approval. PDF generation has been blocked.");
+        } else {
+          alert("Session Terminated: Your account has been removed by the administrator.");
+        }
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      console.warn("verifyActiveUserStatus notice:", err);
+      return true;
     }
   }
 
@@ -471,7 +531,13 @@ class SupabaseManager {
 
   // UPLOAD GENERATED PDF TO SUPABASE STORAGE & DATABASE
   async uploadPdfToSupabase(pdfBlob, filename, farmerData = {}) {
-    if (!this.client) return null;
+    if (!this.client || !this.currentUser) return null;
+
+    const isAllowed = await this.verifyActiveUserStatus(false);
+    if (!isAllowed) {
+      console.warn("Upload rejected: User account has been removed or revoked.");
+      return null;
+    }
 
     try {
       const storagePath = filename;
