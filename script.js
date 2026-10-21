@@ -10,6 +10,8 @@ const frontTemplate = document.getElementById("frontTemplate");
 const backTemplate = document.getElementById("backTemplate");
 const downloadBtn = document.getElementById("downloadBtn");
 const resetBtn = document.getElementById("resetBtn");
+const pdfOperationLoader = document.getElementById("pdfOperationLoader");
+const pdfLoaderMessage = document.getElementById("pdfLoaderMessage");
 
 let photoDataUrl = "";
 let currentViewMode = "drag"; // 'drag', 'spin', or 'both'
@@ -25,6 +27,28 @@ let startY = 0;
 let initialRotateY = 0;
 let initialRotateX = 0;
 let dragDistance = 0;
+let pdfLoaderCompletionTimer = null;
+
+function setPdfOperationLoading(isLoading, message = "Preparing your farmer card…") {
+  if (!pdfOperationLoader) return;
+  if (pdfLoaderCompletionTimer) {
+    clearTimeout(pdfLoaderCompletionTimer);
+    pdfLoaderCompletionTimer = null;
+  }
+  pdfOperationLoader.classList.toggle("hidden", !isLoading);
+  pdfOperationLoader.classList.remove("is-complete");
+  pdfOperationLoader.setAttribute("aria-hidden", String(!isLoading));
+  if (pdfLoaderMessage) pdfLoaderMessage.textContent = message;
+}
+
+function completePdfOperation(message = "Your PDF is ready") {
+  if (!pdfOperationLoader) return;
+  pdfOperationLoader.classList.remove("hidden");
+  pdfOperationLoader.classList.add("is-complete");
+  pdfOperationLoader.setAttribute("aria-hidden", "false");
+  if (pdfLoaderMessage) pdfLoaderMessage.textContent = message;
+  pdfLoaderCompletionTimer = setTimeout(() => setPdfOperationLoading(false), 850);
+}
 
 // Helper function to generate YYYYMMDD_HHMMSS timestamp string
 function getFormattedTimestamp() {
@@ -245,6 +269,392 @@ function init3DDragRotator() {
 
 window.addEventListener("resize", updateCardScale);
 
+// Presentation-only theme control. It never changes form values, card markup,
+// or the separate PDF rendering flow.
+function initThemeToggle() {
+  const toggles = [
+    document.getElementById("themeToggle"),
+    document.getElementById("authThemeToggle")
+  ].filter(Boolean);
+  if (!toggles.length) return;
+
+  const systemTheme = window.matchMedia("(prefers-color-scheme: dark)");
+  let savedTheme = null;
+  // Versioned preference starts every existing installation from the current
+  // operating-system theme, while still remembering future manual changes.
+  try { savedTheme = localStorage.getItem("farmerCardThemePreferenceV2"); } catch (_) {}
+
+  const setTheme = (isDark, persist = false) => {
+    document.body.classList.toggle("dark-mode", isDark);
+    document.documentElement.style.colorScheme = isDark ? "dark" : "light";
+    toggles.forEach((toggle) => {
+      toggle.setAttribute("aria-pressed", String(isDark));
+      toggle.setAttribute("aria-label", isDark ? "Switch to light mode" : "Switch to dark mode");
+      toggle.title = isDark ? "Switch to light mode" : "Switch to dark mode";
+      const label = toggle.querySelector(".theme-toggle-label");
+      if (label) label.textContent = isDark ? "Light Mode" : "Dark Mode";
+    });
+    if (persist) {
+      savedTheme = isDark ? "dark" : "light";
+      try { localStorage.setItem("farmerCardThemePreferenceV2", savedTheme); } catch (_) {}
+    }
+  };
+
+  setTheme(savedTheme ? savedTheme === "dark" : systemTheme.matches);
+  toggles.forEach((toggle) => {
+    toggle.addEventListener("click", () => setTheme(!document.body.classList.contains("dark-mode"), true));
+  });
+  systemTheme.addEventListener("change", (event) => {
+    if (!savedTheme) setTheme(event.matches);
+  });
+}
+
+// A quiet Three.js field gives the preview studio depth without interacting
+// with the actual farmer card, its layout, or its PDF capture.
+function initAmbientFarmScene() {
+  const canvas = document.getElementById("ambientFarmScene");
+  const host = document.querySelector(".preview-panel");
+  if (!canvas || !host || !window.THREE) return;
+
+  const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25));
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+  camera.position.set(0, 0, 14);
+
+  const particleCount = 84;
+  const positions = new Float32Array(particleCount * 3);
+  const colors = new Float32Array(particleCount * 3);
+  const colorA = new THREE.Color("#71d99a");
+  const colorB = new THREE.Color("#8fcff5");
+  for (let i = 0; i < particleCount; i += 1) {
+    const index = i * 3;
+    positions[index] = (Math.random() - 0.5) * 18;
+    positions[index + 1] = (Math.random() - 0.5) * 12;
+    positions[index + 2] = (Math.random() - 0.5) * 5;
+    const color = i % 3 === 0 ? colorB : colorA;
+    colors[index] = color.r;
+    colors[index + 1] = color.g;
+    colors[index + 2] = color.b;
+  }
+
+  const particleGeometry = new THREE.BufferGeometry();
+  particleGeometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  particleGeometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+  const particleMaterial = new THREE.PointsMaterial({ size: 0.075, vertexColors: true, transparent: true, opacity: 0.6, depthWrite: false });
+  const particles = new THREE.Points(particleGeometry, particleMaterial);
+  scene.add(particles);
+
+  const leafGroup = new THREE.Group();
+  const leafMaterial = new THREE.MeshBasicMaterial({ color: "#5bc482", transparent: true, opacity: 0.12, side: THREE.DoubleSide });
+  const leafGeometry = new THREE.CircleGeometry(0.72, 24, 0, Math.PI);
+  for (let i = 0; i < 7; i += 1) {
+    const leaf = new THREE.Mesh(leafGeometry, leafMaterial);
+    leaf.position.set(-6 + i * 2.1, -3.2 + (i % 2) * 5.9, -1.5 - (i % 3));
+    leaf.rotation.z = (i % 2 ? 0.7 : -0.8);
+    leaf.scale.set(1, 1.75, 1);
+    leafGroup.add(leaf);
+  }
+  scene.add(leafGroup);
+
+  const pointer = { x: 0, y: 0 };
+  const resize = () => {
+    const { width, height } = host.getBoundingClientRect();
+    renderer.setSize(width, height, false);
+    camera.aspect = width / Math.max(height, 1);
+    camera.updateProjectionMatrix();
+  };
+  resize();
+  window.addEventListener("resize", resize);
+  host.addEventListener("pointermove", (event) => {
+    const rect = host.getBoundingClientRect();
+    pointer.x = ((event.clientX - rect.left) / rect.width - 0.5) * 0.45;
+    pointer.y = ((event.clientY - rect.top) / rect.height - 0.5) * 0.32;
+  });
+
+  const reducedMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let tick = 0;
+  const animate = () => {
+    tick += 0.003;
+    particles.rotation.y += 0.00055;
+    particles.rotation.x += (pointer.y - particles.rotation.x) * 0.006;
+    leafGroup.rotation.z = Math.sin(tick) * 0.08;
+    leafGroup.position.x += (pointer.x * 1.3 - leafGroup.position.x) * 0.015;
+    renderer.render(scene, camera);
+    if (!reducedMotion) requestAnimationFrame(animate);
+  };
+  animate();
+}
+
+// Dhumketu / Chingari-inspired cursor embers. This runs independently from
+// the card preview and changes palette immediately when the theme changes.
+function initCometCursor() {
+  const canvas = document.getElementById("cometCursorCanvas");
+  const toggle = document.getElementById("cursorEffectToggle");
+  const authModal = document.getElementById("authModal");
+  if (!canvas || !window.matchMedia) return;
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    canvas.classList.add("is-disabled");
+    if (toggle) {
+      toggle.setAttribute("aria-pressed", "false");
+      toggle.disabled = true;
+      toggle.title = "Cursor animation follows your reduced-motion setting";
+      const label = toggle.querySelector("span");
+      if (label) label.textContent = "Cursor FX Off";
+    }
+    return;
+  }
+
+  const context = canvas.getContext("2d");
+  const particles = [];
+  const ribbon = [];
+  const cursor = { x: -100, y: -100, previousX: -100, previousY: -100, visible: false, lastSpawnX: -100, lastSpawnY: -100 };
+  const maxParticles = 118;
+  let frameId = null;
+  let isRunning = false;
+  let effectEnabled = true;
+
+  try {
+    effectEnabled = localStorage.getItem("farmerCardCursorEffect") !== "off";
+  } catch (_) {}
+
+  const isAuthVisible = () => Boolean(authModal && !authModal.classList.contains("hidden"));
+
+  const updateToggle = () => {
+    if (!toggle) return;
+    toggle.setAttribute("aria-pressed", String(effectEnabled));
+    toggle.title = effectEnabled ? "Turn cursor animation off" : "Turn cursor animation on";
+    const label = toggle.querySelector("span");
+    if (label) label.textContent = effectEnabled ? "Cursor FX On" : "Cursor FX Off";
+  };
+
+  const stopEffect = () => {
+    isRunning = false;
+    if (frameId !== null) cancelAnimationFrame(frameId);
+    frameId = null;
+    particles.length = 0;
+    ribbon.length = 0;
+    cursor.visible = false;
+    context.clearRect(0, 0, window.innerWidth, window.innerHeight);
+    canvas.classList.add("is-disabled");
+  };
+
+  const startEffect = () => {
+    if (isRunning || !effectEnabled || isAuthVisible()) return;
+    canvas.classList.remove("is-disabled");
+    isRunning = true;
+    frameId = requestAnimationFrame(animate);
+  };
+
+  const syncEffectState = () => {
+    updateToggle();
+    if (effectEnabled && !isAuthVisible()) startEffect();
+    else stopEffect();
+  };
+
+  const palette = () => document.body.classList.contains("dark-mode")
+    ? ["#7667ff", "#f34cda", "#38d6ff", "#ffd76a"]
+    : ["#1f2636", "#c46605", "#f0a51d", "#3e587f"];
+
+  const resize = () => {
+    const ratio = Math.min(window.devicePixelRatio || 1, 1.25);
+    canvas.width = Math.round(window.innerWidth * ratio);
+    canvas.height = Math.round(window.innerHeight * ratio);
+    canvas.style.width = `${window.innerWidth}px`;
+    canvas.style.height = `${window.innerHeight}px`;
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+  };
+
+  const addParticle = (x, y, burst = false, direction = Math.PI) => {
+    if (particles.length >= maxParticles) particles.splice(0, particles.length - maxParticles + 1);
+    const angle = burst ? Math.random() * Math.PI * 2 : direction + (Math.random() - 0.5) * 1.15;
+    const speed = burst ? 0.55 + Math.random() * 2.2 : 0.28 + Math.random() * 1.05;
+    const life = burst ? 38 + Math.random() * 28 : 40 + Math.random() * 30;
+    particles.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      size: burst ? 1.4 + Math.random() * 2.4 : 0.8 + Math.random() * 1.7,
+      life,
+      maxLife: life,
+      color: palette()[Math.floor(Math.random() * 4)],
+      sparkle: burst || Math.random() > 0.48,
+      drift: (Math.random() - 0.5) * 0.018
+    });
+  };
+
+  const onPointerMove = (event) => {
+    if (!isRunning) return;
+    if (event.pointerType && event.pointerType !== "mouse") return;
+    cursor.previousX = cursor.x;
+    cursor.previousY = cursor.y;
+    cursor.x = event.clientX;
+    cursor.y = event.clientY;
+    cursor.visible = true;
+    ribbon.unshift({ x: cursor.x, y: cursor.y, createdAt: performance.now() });
+    if (ribbon.length > 24) ribbon.pop();
+
+    const distance = Math.hypot(cursor.x - cursor.lastSpawnX, cursor.y - cursor.lastSpawnY);
+    if (distance > 3) {
+      const movementX = cursor.x - cursor.previousX;
+      const movementY = cursor.y - cursor.previousY;
+      const backwardAngle = Math.atan2(movementY, movementX) + Math.PI;
+      addParticle(cursor.x, cursor.y, false, backwardAngle);
+      addParticle(cursor.x, cursor.y, false, backwardAngle);
+      if (Math.random() > 0.3) addParticle(cursor.x, cursor.y, false, backwardAngle);
+      cursor.lastSpawnX = cursor.x;
+      cursor.lastSpawnY = cursor.y;
+    }
+  };
+
+  const onPointerDown = (event) => {
+    if (!isRunning) return;
+    if (event.pointerType && event.pointerType !== "mouse") return;
+    for (let i = 0; i < 14; i += 1) addParticle(event.clientX, event.clientY, true);
+  };
+
+  const drawSparkle = (x, y, radius, alpha, color) => {
+    context.save();
+    context.globalAlpha = alpha;
+    context.fillStyle = color;
+    context.shadowColor = color;
+    context.shadowBlur = 5;
+    context.beginPath();
+    for (let point = 0; point < 8; point += 1) {
+      const angle = -Math.PI / 2 + point * Math.PI / 4;
+      const length = point % 2 === 0 ? radius : radius * 0.34;
+      const px = x + Math.cos(angle) * length;
+      const py = y + Math.sin(angle) * length;
+      if (point === 0) context.moveTo(px, py);
+      else context.lineTo(px, py);
+    }
+    context.closePath();
+    context.fill();
+    context.restore();
+  };
+
+  const drawRibbon = (darkMode, now) => {
+    while (ribbon.length && now - ribbon[ribbon.length - 1].createdAt > 390) ribbon.pop();
+    if (ribbon.length < 3) return;
+
+    const head = ribbon[0];
+    const tail = ribbon[ribbon.length - 1];
+    const colors = darkMode
+      ? ["rgba(55, 213, 255, 0)", "rgba(84, 107, 255, 0.36)", "rgba(244, 73, 220, 0.58)", "rgba(255, 215, 106, 0.8)"]
+      : ["rgba(31, 38, 54, 0)", "rgba(56, 86, 127, 0.24)", "rgba(197, 102, 5, 0.5)", "rgba(240, 165, 29, 0.76)"];
+    const gradient = context.createLinearGradient(tail.x, tail.y, head.x, head.y);
+    colors.forEach((color, index) => gradient.addColorStop(index / (colors.length - 1), color));
+
+    const trace = (strandOffset = 0, phase = 0) => {
+      const offsetPoint = (index) => {
+        const point = ribbon[index];
+        const before = ribbon[Math.max(0, index - 1)];
+        const after = ribbon[Math.min(ribbon.length - 1, index + 1)];
+        const tangentX = before.x - after.x;
+        const tangentY = before.y - after.y;
+        const tangentLength = Math.max(1, Math.hypot(tangentX, tangentY));
+        const tailFactor = index / Math.max(1, ribbon.length - 1);
+        const flutter = Math.sin(index * 1.18 + now * 0.008 + phase) * 2.4 * tailFactor;
+        const offset = strandOffset * tailFactor + flutter;
+        return {
+          x: point.x + (-tangentY / tangentLength) * offset,
+          y: point.y + (tangentX / tangentLength) * offset
+        };
+      };
+
+      const tailPoint = offsetPoint(ribbon.length - 1);
+      context.beginPath();
+      context.moveTo(tailPoint.x, tailPoint.y);
+      for (let index = ribbon.length - 2; index >= 0; index -= 1) {
+        const point = offsetPoint(index);
+        const following = offsetPoint(Math.max(index - 1, 0));
+        context.quadraticCurveTo(point.x, point.y, (point.x + following.x) / 2, (point.y + following.y) / 2);
+      }
+    };
+
+    context.save();
+    context.lineCap = "round";
+    context.lineJoin = "round";
+    context.strokeStyle = gradient;
+    context.globalAlpha = darkMode ? 0.34 : 0.24;
+    context.shadowColor = darkMode ? "#bb5cff" : "#d57a0a";
+    context.shadowBlur = darkMode ? 8 : 4;
+    context.lineWidth = 22;
+    trace();
+    context.stroke();
+
+    const strandColors = darkMode
+      ? ["#28cfff", "#695aff", "#f044d2", "#ffca57"]
+      : ["#243149", "#3e587f", "#b45b00", "#ee9e12"];
+    [-9, -3, 4, 10].forEach((offset, index) => {
+      context.strokeStyle = strandColors[index];
+      context.globalAlpha = darkMode ? 0.72 : 0.58;
+      context.shadowColor = strandColors[index];
+      context.shadowBlur = darkMode ? 5 : 2;
+      context.lineWidth = index === 3 ? 1.2 : 1.8;
+      trace(offset, index * 1.7);
+      context.stroke();
+    });
+    context.restore();
+  };
+
+  const animate = () => {
+    context.clearRect(0, 0, window.innerWidth, window.innerHeight);
+    const darkMode = document.body.classList.contains("dark-mode");
+    const now = performance.now();
+    context.globalCompositeOperation = "source-over";
+    drawRibbon(darkMode, now);
+
+    for (let index = particles.length - 1; index >= 0; index -= 1) {
+      const particle = particles[index];
+      particle.x += particle.vx;
+      particle.y += particle.vy;
+      particle.vx *= 0.965;
+      particle.vy = particle.vy * 0.965 + 0.012;
+      particle.vx += particle.drift;
+      particle.life -= 1;
+      const alpha = Math.max(0, particle.life / particle.maxLife);
+
+      if (particle.life <= 0) {
+        particles.splice(index, 1);
+        continue;
+      }
+
+      context.globalAlpha = alpha * 0.88;
+      context.fillStyle = particle.color;
+      context.beginPath();
+      context.arc(particle.x, particle.y, particle.size * alpha, 0, Math.PI * 2);
+      context.fill();
+
+      if (particle.sparkle && particle.life % 14 === 0) {
+        drawSparkle(particle.x, particle.y, particle.size * 2.6, alpha, particle.color);
+      }
+    }
+
+    context.globalAlpha = 1;
+
+    if (isRunning) frameId = requestAnimationFrame(animate);
+  };
+
+  resize();
+  window.addEventListener("resize", resize, { passive: true });
+  window.addEventListener("pointermove", onPointerMove, { passive: true });
+  window.addEventListener("pointerdown", onPointerDown, { passive: true });
+  window.addEventListener("blur", () => { cursor.visible = false; });
+  if (toggle) {
+    toggle.addEventListener("click", () => {
+      effectEnabled = !effectEnabled;
+      try { localStorage.setItem("farmerCardCursorEffect", effectEnabled ? "on" : "off"); } catch (_) {}
+      syncEffectState();
+    });
+  }
+  if (authModal) {
+    new MutationObserver(syncEffectState).observe(authModal, { attributes: true, attributeFilter: ["class"] });
+  }
+  syncEffectState();
+  return stopEffect;
+}
+
 function getLandRows() {
   const landsMap = {};
   const fd = new FormData(form);
@@ -456,6 +866,7 @@ async function downloadPdf() {
 
     downloadBtn.disabled = true;
     downloadBtn.textContent = "Creating PDF...";
+    setPdfOperationLoading(true, "Generating your farmer card PDF…");
 
     const data = formData();
 
@@ -534,6 +945,7 @@ async function downloadPdf() {
 
     downloadBtn.disabled = false;
     downloadBtn.textContent = "Download PDF";
+    completePdfOperation("Your farmer card PDF is ready");
 }
 
 form.addEventListener("input", (event) => {
@@ -712,6 +1124,7 @@ async function proceedWithSuperAdminUpdatePdf() {
 
   downloadBtn.disabled = true;
   downloadBtn.textContent = "Updating & Replacing PDF...";
+  setPdfOperationLoading(true, "Updating and replacing the farmer card PDF…");
 
   const targetRecord = currentEditingCardRecord;
   const data = formData();
@@ -800,6 +1213,7 @@ async function proceedWithSuperAdminUpdatePdf() {
 
   printStack.innerHTML = "";
   downloadBtn.disabled = false;
+  completePdfOperation("Your updated farmer card PDF is ready");
   window.cancelSuperAdminEditCard();
 }
 
@@ -858,12 +1272,23 @@ function initAuthAndAdminUI() {
   const btnAuthSubmit = document.getElementById("btnAuthSubmit");
   const authErrorMsg = document.getElementById("authErrorMsg");
   const btnLogout = document.getElementById("btnLogout");
+  const authRequestLoader = document.getElementById("authRequestLoader");
+  const authLoaderMessage = document.getElementById("authLoaderMessage");
 
   // Pending approval screen elements
   const authPendingScreen = document.getElementById("authPendingScreen");
   const pendingUserEmailText = document.getElementById("pendingUserEmailText");
   const btnCheckApprovalStatus = document.getElementById("btnCheckApprovalStatus");
   const btnBackToSignIn = document.getElementById("btnBackToSignIn");
+
+  function setAuthRequestLoading(isLoading, message = "Contacting secure service…") {
+    if (authRequestLoader) {
+      authRequestLoader.classList.toggle("hidden", !isLoading);
+      authRequestLoader.setAttribute("aria-hidden", String(!isLoading));
+    }
+    if (authLoaderMessage) authLoaderMessage.textContent = message;
+    if (authForm) authForm.setAttribute("aria-busy", String(isLoading));
+  }
 
   function showPendingApprovalView(email) {
     lastAttemptedEmail = email || authEmailInput.value.trim();
@@ -898,7 +1323,7 @@ function initAuthAndAdminUI() {
       }
 
       btnCheckApprovalStatus.disabled = true;
-      btnCheckApprovalStatus.textContent = "Checking...";
+      setAuthRequestLoading(true, "Checking approval status…");
 
       try {
         const { data: profile } = await window.supabaseManager.client
@@ -906,15 +1331,6 @@ function initAuthAndAdminUI() {
           .select("role, approved")
           .eq("email", emailToCheck)
           .maybeSingle();
-
-        btnCheckApprovalStatus.disabled = false;
-        btnCheckApprovalStatus.innerHTML = `
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="23 4 23 10 17 10"></polyline>
-            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
-          </svg>
-          Check Status
-        `;
 
         if (!profile) {
           alert("Account Status: No account found or your registration was declined by the administrator.");
@@ -930,9 +1346,17 @@ function initAuthAndAdminUI() {
           alert("⏳ Status: Your account is still awaiting Super Admin approval.\n\nPlease wait for the administrator to approve you.");
         }
       } catch (err) {
-        btnCheckApprovalStatus.disabled = false;
-        btnCheckApprovalStatus.textContent = "Check Status";
         alert("Unable to verify status. Please try again in a few moments.");
+      } finally {
+        setAuthRequestLoading(false);
+        btnCheckApprovalStatus.disabled = false;
+        btnCheckApprovalStatus.innerHTML = `
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+          </svg>
+          Check Status
+        `;
       }
     });
   }
@@ -968,18 +1392,23 @@ function initAuthAndAdminUI() {
 
       lastAttemptedEmail = email;
       btnAuthSubmit.disabled = true;
-      btnAuthSubmit.textContent = "Processing...";
+      setAuthRequestLoading(true, isSignUpMode ? "Creating your account…" : "Signing you in securely…");
       if (authErrorMsg) authErrorMsg.classList.add("hidden");
 
       let result;
-      if (isSignUpMode) {
-        result = await window.supabaseManager.signUp(email, password);
-      } else {
-        result = await window.supabaseManager.signIn(email, password);
+      try {
+        if (isSignUpMode) {
+          result = await window.supabaseManager.signUp(email, password);
+        } else {
+          result = await window.supabaseManager.signIn(email, password);
+        }
+      } catch (err) {
+        result = { error: { message: "Unable to reach the secure service. Please try again." } };
+      } finally {
+        setAuthRequestLoading(false);
+        btnAuthSubmit.disabled = false;
+        btnAuthSubmit.textContent = isSignUpMode ? "Register Account" : "Sign In";
       }
-
-      btnAuthSubmit.disabled = false;
-      btnAuthSubmit.textContent = isSignUpMode ? "Register Account" : "Sign In";
 
       if (result && result.error) {
         const errMsg = result.error.message || "";
@@ -1027,5 +1456,8 @@ initLandRows();
 render();
 initViewModeControls();
 init3DDragRotator();
+initThemeToggle();
+initAmbientFarmScene();
+initCometCursor();
 setTimeout(updateCardScale, 100);
 initAuthAndAdminUI();

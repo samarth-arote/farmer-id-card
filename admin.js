@@ -124,14 +124,24 @@ class AdminConsoleManager {
 
   renderLoading() {
     if (this.tablePdfsBody) {
-      this.tablePdfsBody.innerHTML = `<tr><td colspan="6" class="text-center">Loading PDF records from Supabase...</td></tr>`;
+      this.tablePdfsBody.innerHTML = this.renderLoadingRow(6, "Loading PDF records from Supabase…");
     }
     if (this.tableUsersBody) {
-      this.tableUsersBody.innerHTML = `<tr><td colspan="6" class="text-center">Loading user records from Supabase...</td></tr>`;
+      this.tableUsersBody.innerHTML = this.renderLoadingRow(6, "Loading user records from Supabase…");
     }
     if (this.tablePendingApprovalUsersBody) {
-      this.tablePendingApprovalUsersBody.innerHTML = `<tr><td colspan="5" class="text-center">Loading pending approvals...</td></tr>`;
+      this.tablePendingApprovalUsersBody.innerHTML = this.renderLoadingRow(5, "Loading pending approvals…");
     }
+  }
+
+  renderLoadingRow(colspan, message) {
+    return `<tr><td colspan="${colspan}" class="text-center admin-loader-cell">
+      <div class="admin-inline-loader" role="status" aria-live="polite">
+        <img src="assets/logo.png" alt="" class="admin-loader-logo">
+        <span class="admin-loader-spinner" aria-hidden="true"></span>
+        <span>${message}</span>
+      </div>
+    </td></tr>`;
   }
 
   updateStats(pdfCount, users = []) {
@@ -545,7 +555,13 @@ class UserHistoryManager {
   async loadMyData() {
     if (!window.supabaseManager) return;
     if (this.tableBody) {
-      this.tableBody.innerHTML = `<tr><td colspan="5" class="text-center">Loading your PDF history...</td></tr>`;
+      this.tableBody.innerHTML = `<tr><td colspan="5" class="text-center admin-loader-cell">
+        <div class="admin-inline-loader" role="status" aria-live="polite">
+          <img src="assets/logo.png" alt="" class="admin-loader-logo">
+          <span class="admin-loader-spinner" aria-hidden="true"></span>
+          <span>Loading your PDF history…</span>
+        </div>
+      </td></tr>`;
     }
 
     const pdfs = await window.supabaseManager.fetchMyPdfHistory();

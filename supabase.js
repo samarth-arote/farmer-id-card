@@ -294,6 +294,17 @@ class SupabaseManager {
     this.updateUIForSession();
   }
 
+  // The main app is display:none while signed out. Recalculate all responsive
+  // preview measurements only after it has been revealed by authentication.
+  refreshRevealedAppLayout() {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        window.dispatchEvent(new Event("resize"));
+        window.dispatchEvent(new CustomEvent("farmer-app-visible"));
+      });
+    });
+  }
+
   updateUIForSession() {
     const authModal = document.getElementById("authModal");
     const appMain = document.querySelector(".app");
@@ -308,6 +319,7 @@ class SupabaseManager {
         appMain.style.removeProperty("display");
         appMain.style.removeProperty("pointer-events");
       }
+      this.refreshRevealedAppLayout();
       if (userEmailSpan) {
         userEmailSpan.textContent = this.currentUser.email;
       }

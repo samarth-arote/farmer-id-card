@@ -20,9 +20,21 @@
   <script src="assets/vendor/qrcode.min.js"></script>
 </head>
 <body>
+  <!-- Pointer-effects canvas: decorative only and independent from card/PDF rendering. -->
+  <canvas id="cometCursorCanvas" class="comet-cursor-canvas" aria-hidden="true"></canvas>
 
   <!-- Supabase Authentication Modal (Login / Register) with Anti-Bypass Blur Backdrop -->
   <div class="auth-modal-overlay" id="authModal">
+    <button class="auth-theme-toggle" type="button" id="authThemeToggle" aria-pressed="false" aria-label="Switch to dark mode" title="Switch to dark mode">
+      <svg class="theme-icon-moon" viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"></path>
+      </svg>
+      <svg class="theme-icon-sun" viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4"></circle>
+        <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"></path>
+      </svg>
+      <span class="theme-toggle-label">Dark Mode</span>
+    </button>
     <div class="auth-card">
       <div class="auth-logo-wrapper">
         <img src="assets/logo.png" alt="Farmer Card Logo" class="auth-logo-img">
@@ -52,6 +64,13 @@
           Sign In
         </button>
       </form>
+
+      <!-- Shown only while a real authentication or approval-status request runs. -->
+      <div class="auth-request-loader hidden" id="authRequestLoader" role="status" aria-live="polite" aria-hidden="true">
+        <div class="auth-loader-spinner" aria-hidden="true"></div>
+        <strong id="authLoaderMessage">Contacting secure service…</strong>
+        <span>Please wait for the request to finish.</span>
+      </div>
 
       <!-- Awaiting Super Admin Approval Screen State -->
       <div class="auth-pending-screen hidden" id="authPendingScreen">
@@ -577,11 +596,30 @@
 
     <!-- Right Side: Live Card Preview Panel -->
     <section class="preview-panel">
+    <canvas id="ambientFarmScene" class="ambient-farm-scene" aria-hidden="true"></canvas>
       <div class="preview-toolbar">
         <div>
           <h2>Live Preview</h2>
         </div>
         <div class="view-mode-buttons">
+          <button class="btn btn-secondary btn-mode btn-theme-toggle" type="button" id="themeToggle" aria-pressed="false" title="Switch to dark mode">
+            <svg class="theme-icon-moon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"></path>
+            </svg>
+            <svg class="theme-icon-sun" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <circle cx="12" cy="12" r="4"></circle>
+              <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"></path>
+            </svg>
+            <span class="theme-toggle-label">Dark Mode</span>
+          </button>
+          <button class="btn btn-secondary btn-mode btn-cursor-toggle" type="button" id="cursorEffectToggle" aria-pressed="true" title="Turn cursor animation off">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 3l1.2 4.1L17 9l-3.8 1.9L12 15l-1.2-4.1L7 9l3.8-1.9L12 3z"></path>
+              <path d="M19 14l.7 2.3L22 17l-2.3.7L19 20l-.7-2.3L16 17l2.3-.7L19 14z"></path>
+              <path d="M5 3l.6 2L8 6l-2.4 1L5 9l-.6-2L2 6l2.4-1L5 3z"></path>
+            </svg>
+            <span>Cursor FX On</span>
+          </button>
           <button class="btn btn-secondary btn-mode active" type="button" id="btnModeFlip">
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
@@ -663,6 +701,21 @@
     </section>
   </main>
 
+  <!-- Visible only while the real PDF canvas/PDF/upload work is running. -->
+  <div class="pdf-operation-loader hidden" id="pdfOperationLoader" role="status" aria-live="polite" aria-hidden="true">
+    <div class="pdf-loader-card">
+      <img src="assets/logo.png" alt="" class="pdf-loader-logo">
+      <div class="pdf-loader-status" aria-hidden="true">
+        <div class="pdf-loader-spinner"></div>
+        <svg class="pdf-loader-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 12.5l4.2 4.2L19.5 6.5"></path>
+        </svg>
+      </div>
+      <strong id="pdfLoaderMessage">Preparing your farmer card…</strong>
+      <span>Please wait while the PDF is generated.</span>
+    </div>
+  </div>
+
   <div class="print-stack" id="printStack"></div>
 
   <!-- TEMPLATES -->
@@ -711,6 +764,7 @@
   </template>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="supabase.js"></script>
   <script src="admin.js"></script>
   <script src="script.js"></script>
