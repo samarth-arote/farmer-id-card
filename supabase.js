@@ -15,6 +15,7 @@ class SupabaseManager {
     this.client = null;
     this.currentUser = null;
     this.isAdmin = false;
+    this.inactivityTimer = null;
 
     this.initClient();
   }
@@ -28,13 +29,14 @@ class SupabaseManager {
       this.initAuthGuard();
       this.startLiveSessionVerifier();
 
-      this.client.auth.onAuthStateChange(async (event, session) => {
+      this.client.auth.onAuthStateChange((event, session) => {
         if (event === "SIGNED_IN" || event === "USER_UPDATED" || event === "TOKEN_REFRESHED") {
-          await this.checkCurrentSession();
+          setTimeout(() => this.checkCurrentSession(), 0);
         } else if (event === "SIGNED_OUT") {
           this.clearUserSession();
         }
       });
+      this.initInactivityLogout();
     } else {
       setTimeout(() => this.initClient(), 250);
     }
@@ -261,6 +263,7 @@ class SupabaseManager {
     }
 
     this.currentUser = user;
+    if (this.resetInactivityTimer) this.resetInactivityTimer();
 
     if (isSuperAdmin) {
       this.isAdmin = true;
@@ -289,9 +292,29 @@ class SupabaseManager {
   }
 
   clearUserSession() {
+    if (this.inactivityTimer) {
+      clearTimeout(this.inactivityTimer);
+      this.inactivityTimer = null;
+    }
     this.currentUser = null;
     this.isAdmin = false;
     this.updateUIForSession();
+  }
+
+  initInactivityLogout() {
+    const timeoutMs = 5 * 60 * 1000;
+    const resetTimer = () => {
+      if (this.inactivityTimer) clearTimeout(this.inactivityTimer);
+      if (!this.currentUser) return;
+      this.inactivityTimer = setTimeout(() => {
+        this.inactivityTimer = null;
+        if (this.currentUser) this.signOut();
+      }, timeoutMs);
+    };
+    ["pointerdown", "keydown", "pointermove", "touchstart", "scroll"].forEach((eventName) => {
+      window.addEventListener(eventName, resetTimer, { passive: true });
+    });
+    this.resetInactivityTimer = resetTimer;
   }
 
   // The main app is display:none while signed out. Recalculate all responsive
