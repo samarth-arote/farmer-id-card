@@ -358,32 +358,43 @@ function initAmbientFarmScene() {
   scene.add(leafGroup);
 
   const pointer = { x: 0, y: 0 };
+  let ambientFrameId = null;
+  let ambientVisible = false;
   const resize = () => {
     const { width, height } = host.getBoundingClientRect();
+    ambientVisible = width > 0 && height > 0;
     renderer.setSize(width, height, false);
     camera.aspect = width / Math.max(height, 1);
     camera.updateProjectionMatrix();
+    if (!ambientVisible && ambientFrameId !== null) {
+      cancelAnimationFrame(ambientFrameId);
+      ambientFrameId = null;
+    }
+    if (ambientVisible && !reducedMotion && ambientFrameId === null) {
+      ambientFrameId = requestAnimationFrame(animate);
+    }
   };
-  resize();
-  window.addEventListener("resize", resize);
-  host.addEventListener("pointermove", (event) => {
-    const rect = host.getBoundingClientRect();
-    pointer.x = ((event.clientX - rect.left) / rect.width - 0.5) * 0.45;
-    pointer.y = ((event.clientY - rect.top) / rect.height - 0.5) * 0.32;
-  });
-
   const reducedMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   let tick = 0;
   const animate = () => {
+    ambientFrameId = null;
+    if (!ambientVisible) return;
     tick += 0.003;
     particles.rotation.y += 0.00055;
     particles.rotation.x += (pointer.y - particles.rotation.x) * 0.006;
     leafGroup.rotation.z = Math.sin(tick) * 0.08;
     leafGroup.position.x += (pointer.x * 1.3 - leafGroup.position.x) * 0.015;
     renderer.render(scene, camera);
-    if (!reducedMotion) requestAnimationFrame(animate);
+    if (!reducedMotion && ambientVisible) ambientFrameId = requestAnimationFrame(animate);
   };
-  animate();
+  resize();
+  window.addEventListener("resize", resize, { passive: true });
+  host.addEventListener("pointermove", (event) => {
+    if (!ambientVisible) return;
+    const rect = host.getBoundingClientRect();
+    pointer.x = ((event.clientX - rect.left) / rect.width - 0.5) * 0.45;
+    pointer.y = ((event.clientY - rect.top) / rect.height - 0.5) * 0.32;
+  }, { passive: true });
 }
 
 // Dhumketu / Chingari-inspired cursor embers. This runs independently from
@@ -1397,11 +1408,15 @@ function initAuthAndAdminUI() {
 
       let result;
       try {
-        if (isSignUpMode) {
-          result = await window.supabaseManager.signUp(email, password);
-        } else {
-          result = await window.supabaseManager.signIn(email, password);
-        }
+        const authRequest = isSignUpMode
+          ? window.supabaseManager.signUp(email, password)
+          : window.supabaseManager.signIn(email, password);
+        result = await Promise.race([
+          authRequest,
+          new Promise((resolve) => setTimeout(() => resolve({
+            error: { message: "The secure service is taking too long to respond. Please try again." }
+          }), 20000))
+        ]);
       } catch (err) {
         result = { error: { message: "Unable to reach the secure service. Please try again." } };
       } finally {
