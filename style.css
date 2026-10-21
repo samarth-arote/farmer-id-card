@@ -2683,3 +2683,32 @@ body.dark-mode .brand-subtext {
     font-size: 10.5px;
   }
 }
+/* Lightweight cursor particles; bounded lifetime keeps interaction cheap. */
+.cursor-spark {
+  position: fixed;
+  z-index: 9999;
+  width: 7px;
+  height: 7px;
+  pointer-events: none;
+  border-radius: 50%;
+  background: #d57a0a;
+  box-shadow: 0 0 10px rgba(213, 122, 10, .9);
+  transform: translate(-50%, -50%);
+  animation: cursor-spark-fade .52s ease-out forwards;
+}
+
+.dark-mode .cursor-spark {
+  background: #ffe08a;
+  box-shadow: 0 0 12px rgba(255, 215, 106, 1);
+}
+
+.cursor-spark-burst {
+  width: 9px;
+  height: 9px;
+  animation-duration: .68s;
+}
+
+@keyframes cursor-spark-fade {
+  from { opacity: .9; transform: translate(-50%, -50%) scale(1); }
+  to { opacity: 0; transform: translate(calc(-50% + var(--spark-x)), calc(-50% + var(--spark-y))) scale(.15); }
+}

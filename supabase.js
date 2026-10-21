@@ -28,11 +28,9 @@ class SupabaseManager {
       this.initAuthGuard();
       this.startLiveSessionVerifier();
 
-      // Never await profile/session queries inside Supabase's auth callback.
-      // Doing so can keep signInWithPassword pending indefinitely.
-      this.client.auth.onAuthStateChange((event, session) => {
+      this.client.auth.onAuthStateChange(async (event, session) => {
         if (event === "SIGNED_IN" || event === "USER_UPDATED" || event === "TOKEN_REFRESHED") {
-          setTimeout(() => this.checkCurrentSession(), 0);
+          await this.checkCurrentSession();
         } else if (event === "SIGNED_OUT") {
           this.clearUserSession();
         }

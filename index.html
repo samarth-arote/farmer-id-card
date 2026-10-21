@@ -20,8 +20,6 @@
   <script src="assets/vendor/qrcode.min.js"></script>
 </head>
 <body>
-  <!-- Pointer-effects canvas: decorative only and independent from card/PDF rendering. -->
-  <canvas id="cometCursorCanvas" class="comet-cursor-canvas" aria-hidden="true"></canvas>
 
   <!-- Supabase Authentication Modal (Login / Register) with Anti-Bypass Blur Backdrop -->
   <div class="auth-modal-overlay" id="authModal">
@@ -612,14 +610,6 @@
             </svg>
             <span class="theme-toggle-label">Dark Mode</span>
           </button>
-          <button class="btn btn-secondary btn-mode btn-cursor-toggle" type="button" id="cursorEffectToggle" aria-pressed="true" title="Turn cursor animation off">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M12 3l1.2 4.1L17 9l-3.8 1.9L12 15l-1.2-4.1L7 9l3.8-1.9L12 3z"></path>
-              <path d="M19 14l.7 2.3L22 17l-2.3.7L19 20l-.7-2.3L16 17l2.3-.7L19 14z"></path>
-              <path d="M5 3l.6 2L8 6l-2.4 1L5 9l-.6-2L2 6l2.4-1L5 3z"></path>
-            </svg>
-            <span>Cursor FX On</span>
-          </button>
           <button class="btn btn-secondary btn-mode active" type="button" id="btnModeFlip">
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
@@ -764,9 +754,8 @@
   </template>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="supabase.js?v=20261021.3"></script>
+  <script src="supabase.js"></script>
   <script src="admin.js"></script>
-  <script src="script.js?v=20261021.2"></script>
+  <script src="script.js"></script>
 </body>
 </html>

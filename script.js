@@ -314,7 +314,36 @@ function initThemeToggle() {
 function initAmbientFarmScene() {
   const canvas = document.getElementById("ambientFarmScene");
   const host = document.querySelector(".preview-panel");
-  if (!canvas || !host || !window.THREE) return;
+  if (!canvas || !host) return;
+
+  const appMain = document.querySelector(".app");
+  if (appMain && appMain.classList.contains("locked")) {
+    if (!window.__farmerAmbientObserver) {
+      window.__farmerAmbientObserver = new MutationObserver(() => {
+        if (!appMain.classList.contains("locked")) {
+          window.__farmerAmbientObserver.disconnect();
+          window.__farmerAmbientObserver = null;
+          initAmbientFarmScene();
+        }
+      });
+      window.__farmerAmbientObserver.observe(appMain, { attributes: true, attributeFilter: ["class"] });
+    }
+    return;
+  }
+
+  if (!window.THREE) {
+    if (!window.__farmerThreeLoadPromise) {
+      window.__farmerThreeLoadPromise = new Promise((resolve, reject) => {
+        const threeScript = document.createElement("script");
+        threeScript.src = "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js";
+        threeScript.onload = resolve;
+        threeScript.onerror = reject;
+        document.head.appendChild(threeScript);
+      });
+    }
+    window.__farmerThreeLoadPromise.then(() => initAmbientFarmScene()).catch(() => {});
+    return;
+  }
 
   const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25));
@@ -664,6 +693,49 @@ function initCometCursor() {
   }
   syncEffectState();
   return stopEffect;
+}
+
+// Lightweight cursor sparkle trail: short-lived DOM particles, no canvas or
+// render loop. It is deliberately disabled while authentication is visible.
+function initLightCursorParticles() {
+  const authModal = document.getElementById("authModal");
+  if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  let last = 0;
+  let active = 0;
+  const onMove = (event) => {
+    if (authModal && !authModal.classList.contains("hidden")) return;
+    const now = performance.now();
+    if (now - last < 28 || active >= 18) return;
+    last = now;
+    active += 1;
+    const particle = document.createElement("i");
+    particle.className = "cursor-spark";
+    particle.style.left = `${event.clientX}px`;
+    particle.style.top = `${event.clientY}px`;
+    particle.style.setProperty("--spark-x", `${(Math.random() - 0.5) * 22}px`);
+    particle.style.setProperty("--spark-y", `${(Math.random() - 0.5) * 22}px`);
+    document.body.appendChild(particle);
+    window.setTimeout(() => { particle.remove(); active -= 1; }, 520);
+  };
+  const onClick = (event) => {
+    if (authModal && !authModal.classList.contains("hidden")) return;
+    const burstCount = Math.min(12, 26 - active);
+    for (let index = 0; index < burstCount; index += 1) {
+      active += 1;
+      const particle = document.createElement("i");
+      particle.className = "cursor-spark cursor-spark-burst";
+      particle.style.left = `${event.clientX}px`;
+      particle.style.top = `${event.clientY}px`;
+      const angle = (Math.PI * 2 * index) / burstCount + Math.random() * 0.35;
+      const distance = 24 + Math.random() * 34;
+      particle.style.setProperty("--spark-x", `${Math.cos(angle) * distance}px`);
+      particle.style.setProperty("--spark-y", `${Math.sin(angle) * distance}px`);
+      document.body.appendChild(particle);
+      window.setTimeout(() => { particle.remove(); active -= 1; }, 680);
+    }
+  };
+  window.addEventListener("pointermove", onMove, { passive: true });
+  window.addEventListener("pointerdown", onClick, { passive: true });
 }
 
 function getLandRows() {
@@ -1472,7 +1544,20 @@ render();
 initViewModeControls();
 init3DDragRotator();
 initThemeToggle();
-initAmbientFarmScene();
-initCometCursor();
+// Optional visual effects are intentionally deferred until authentication has
+// revealed the main app. This keeps the sign-in page lightweight and avoids
+// browser/GPU crashes before Supabase can receive a request.
+const startOptionalVisuals = () => {
+  initAmbientFarmScene();
+};
+const initialApp = document.querySelector(".app");
+if (initialApp && initialApp.classList.contains("locked")) {
+  window.addEventListener("farmer-app-visible", startOptionalVisuals, { once: true });
+} else {
+  startOptionalVisuals();
+}
+// Start the cheap pointer listener immediately; it stays visually inactive
+// until the authentication overlay is hidden.
+initLightCursorParticles();
 setTimeout(updateCardScale, 100);
 initAuthAndAdminUI();
